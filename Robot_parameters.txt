@@ -1,0 +1,16 @@
+==== Servo limits ====
+(Servo) (pos down)-(pos up)
+SERVO_0 95-5
+SERVO_1 104-14
+SERVO_2 79-169
+SERVO_3 78-168
+
+==== Lift ====
+LIFT_L_MM_PER_REV 16.07
+LIFT_R_MM_PER_REV 16.05
+LIST_STEPS_PER_REV 800
+
+==== WHEELS ====
+WHEEL_R 0.0455     // m
+WHEEL_BASE 0.2075  // m
+WHEEL_STEPS_PER_REV 800

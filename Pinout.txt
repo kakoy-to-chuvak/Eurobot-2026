@@ -1,0 +1,37 @@
+(Name) (Pin on esp32)
+
+// Main motors
+WHEEL_L_ENA 4 
+WHEEL_L_STP 19
+WHEEL_L_DIR 18
+
+WHEEL_R_ENA 5
+WHEEL_R_STP 23
+WHEEL_R_DIR 22
+
+
+// Lift
+LIFT_L_ENA 26
+LIFT_L_DIR 13
+LIFT_L_STP 12
+
+LIFT_R_ENA 25
+LIFT_R_DIR 14
+LIFT_R_STP 27
+
+
+// Servos
+SERVO_0 32
+SERVO_1 33
+SERVO_2 15
+SERVO_3 2
+
+
+// Lidar
+LIDAR_RX_PIN 16    // lidar TX -> ESP RX
+
+
+// Other
+STARTER 0
+SIDE_SWITCH 21
+
