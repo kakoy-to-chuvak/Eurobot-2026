@@ -27,37 +27,35 @@ uint32_t tps_timer = 0;
 void setup() {
     Serial.begin(115200);
 
-    LogDebug("Setup main motors\n");
     SetupWheels();
-
-    LogDebug("Setup lift\n");
     SetupLift();
-
-    LogDebug("Setup servo\n");
     SetupServo();
 
 #if CREATE_ACCESS
     // Creating access point
-    LogInfo("Creating acces point \"%s\"\n", MY_SSID);
+    LogInfo("Creating acces point \"%s\"", MY_SSID);
     WiFi.mode(WIFI_AP_STA);
     WiFi.softAP(MY_SSID, MY_PASSWORD);
     delay(200);
     
     // Get ip of access point
-    LogInfo("Created! IP: %s\n", WiFi.softAPIP().toString().c_str());
+    LogInfo("Access point created!");
+    LogInfo("IP: %s", WiFi.softAPIP().toString().c_str());
 #else
     WiFi.mode(WIFI_STA);
     WiFi.begin(SSID, PASSWORD);
-    Serial.print("Connecting to WiFi");
+    LogInfo("Connecting to WiFi");
+    
     while (WiFi.status() != WL_CONNECTED) {
         delay(300);
         Serial.print('.');
     }
-    Serial.println("\nConnected!\nIP: " + WiFi.localIP().toString());
+
+    LogInfo("Wifi connected!");
+    LogInfo("IP: %s", WiFi.localIP().toString().c_str());
 #endif
 
-    LogDebug("Starting server\n");
-    SetupServer();
+    SetupSocketServer();
 
 
     // Запуск задачи лидара на ядре 0
@@ -72,7 +70,7 @@ void loop() {
     uint32_t current_time = millis();
 
     if ( current_time - server_timer > SERVER_DELAY ) {
-        HandleServer();
+        HandleAPIServer();
         server_timer = current_time;
     }
 

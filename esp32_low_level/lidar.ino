@@ -1,3 +1,5 @@
+#include <WiFiUdp.h>
+
 #include "pinout.h"
 #include "parameters.h"
 
@@ -17,6 +19,34 @@ static uint8_t frameCount = 0;
 static float prevStartAngle = -1;
 
 
+// UDP server
+#define UDP_PASSWORD "udp_password"
+WiFiUDP udp_server;
+IPAddress udp_client_ip;
+
+void StartUdpServer() {
+
+    // Starting udp server
+    LogInfo("Starting UDP server on port %i", UDP_SERVER_PORT);
+    udp_server.begin(UDP_SERVER_PORT);
+    LogInfo("UDP server started");
+
+    // Waiting for udp client
+    LogInfo("Waiting for udp client");
+    while ( !udp_server.parsePacket() ) {
+        vTaskDelay(10);
+    }
+
+    LogInfo("UDP client connected");
+
+    uint8_t data[32];
+    // read data
+    udp_server.read(data, 32);
+
+    udp_client_ip = udp_server.remoteIP();
+    LogInfo("UDP client registred! IP: %s", udp_client_ip.toString().c_str());
+}
+
 // ==== Helper lidar functions ====
 inline float decodeAngle(uint16_t _Raw) {
     // Декодирует угол (двухбайтное значение) из формата LDS
@@ -29,11 +59,12 @@ inline float decodeAngle(uint16_t _Raw) {
 }
 bool readBytes(HardwareSerial &_Serial, uint8_t *_Dst, size_t _Len, uint32_t _Timeout = 300) {
     uint32_t t0 = millis();
-    for ( size_t i = 0; i < _Len; i++ ) {
-        while (!_Serial.available()) {
-            if (millis() - t0 > _Timeout) return false;
+    for ( size_t i = 0 ; i < _Len ; i++ ) {
+        while ( !_Serial.available() ) {
+            if ( millis() - t0 > _Timeout ) {
+                return false;
+            }
             vTaskDelay(1);
-            esp_task_wdt_reset();
         }
         _Dst[i] = _Serial.read();
     }
@@ -51,7 +82,6 @@ bool waitLidarHeader(HardwareSerial &_Serial) {
             }
         }
         if (millis() - t0 > 200) return false;
-        esp_task_wdt_reset();
     }
 }
 inline uint16_t crc16(uint16_t _Crc, uint8_t _V) {
@@ -65,12 +95,13 @@ inline uint16_t crc16(uint16_t _Crc, uint8_t _V) {
 
 // ==== Main lidar task ====
 void LidarTask(void *_Param) {
-    esp_task_wdt_add(NULL);
     Serial2.begin(LIDAR_BAUD, SERIAL_8N1, LIDAR_RX_PIN, LIDAR_TX_PIN);
     uint8_t body[BODY_LEN];
+
+    StartUdpServer();
+
     
     while (true) {
-        esp_task_wdt_reset();
         vTaskDelay(1);
 
         if ( !waitLidarHeader(Serial2) || !readBytes(Serial2, body, BODY_LEN) ) {
@@ -78,7 +109,7 @@ void LidarTask(void *_Param) {
         }
         
         // Распарсить порцию точек лидара
-        float startDeg = decodeAngle(body[2] | (body[3] << 8));
+        float startDeg = decodeAngle(   body[2] | (body[3] << 8));
         uint8_t offset = 4;
         uint16_t dist[8];
         uint8_t quality[8];
@@ -128,7 +159,7 @@ void LidarTask(void *_Param) {
             scanBuf[scanSize + 1] = crc >> 8;
             
             // Отправляем по Socket
-            ServerSendLidar(scanBuf, scanSize + 2);
+            udp_server.write(scanBuf, scanSize + 2);
 
             // Сбрасываем буфер для следующего оборота
             wr = scanBuf;

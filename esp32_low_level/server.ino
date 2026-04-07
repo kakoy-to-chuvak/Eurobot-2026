@@ -5,18 +5,21 @@
 #include "parameters.h"
 
 
-uint8_t send_buffer[64];
-int buffer_counter;
 
-#define NEW_MSG(event) do{  send_buffer[2] = (event); \
-                            buffer_counter=3;   }while(0)
+uint8_t __send_buffer[64];
+int __buffer_counter;
 
-#define SET_SEND_DATA(type, var) do{    *(type*)(send_buffer + buffer_counter) = (var); \
-                                        buffer_counter += sizeof(type);    }while(0)
+// macros for sending messages
+#define NEW_MSG(event) do{  __send_buffer[2] = (event); \
+                            __buffer_counter=3;   }while(0)
 
-#define SEND_MSG(client) do{    *(uint16_t*)send_buffer = buffer_counter - 2;    \
-                                (client).write(send_buffer, buffer_counter);  \
-                                buffer_counter = 0;    }while(0)
+#define SET_SEND_DATA(type, var) do{    *(type*)(__send_buffer + __buffer_counter) = (var); \
+                                        __buffer_counter += sizeof(type);    }while(0)
+
+#define SEND_MSG() do{  *(uint16_t*)__send_buffer = __buffer_counter - 2;    \
+                        socket_client.write(__send_buffer, __buffer_counter);  \
+                        __buffer_counter = 0;   \
+                        LogTrace("Send message");   }while(0)
 
 
 // Server events
@@ -32,6 +35,7 @@ int buffer_counter;
 #define SERVER_ANSWER_GET_SERVO_STATE  43
 #define SERVER_ANSWER_GET_ODOMETRY     44
 
+
 #define SERVER_SET_MOTORS_SPEED 71
 #define SERVER_SET_LIFT_HEIGHT  72
 #define SERVER_SET_SERVO_STATE  73
@@ -40,147 +44,88 @@ int buffer_counter;
 #define SERVER_SEND_LIDAR 110
 
 
-struct MyClient {
-    WiFiClient client;
 
-    int data_size;
 
-    uint32_t connect_time;
-    uint32_t request_time;
-
-    struct MyClient *next;
-    struct MyClient *prev;
-};
+WiFiServer socket_server(SERVER_PORT, 1);
+WiFiClient socket_client;
+int data_size;
 
 
 
-WiFiServer server(SERVER_PORT);
-struct MyClient *clients = NULL;
-int now_id = 0;
 
 
+inline void SetupSocketServer() {
+    LogInfo("Starting socket server on port %i", SERVER_PORT);
+    socket_server.begin();
+    LogInfo("Socket server started");
 
-void DeleteClient(struct MyClient *_Client) {
-    if ( _Client->client.connected() ) {
-        _Client->client.stop();
+    LogInfo("Waiting for socket client");
+    while ( !socket_server.hasClient() ) {
+        delay(10);
     }
 
-    if ( _Client->next ) {
-        _Client->next->prev = _Client->prev;
-    }
-
-    if ( _Client->prev ) {
-        _Client->prev->next = _Client->next;
-    } else {
-        clients = _Client->next;
-    }
-}
- 
-
-
-inline void SetupServer() {
-    LogInfo("Starting server on port %i\n", SERVER_PORT);
-    server.begin();
-    LogInfo("Server started\n");
+    socket_client = socket_server.accept();
+    LogInfo("Socket client connected! IP: %s", socket_client.localIP().toString().c_str());
 }
 
 
 
-void HandleServer() {
-    while ( server.hasClient() ) {
-        WiFiClient new_sock = server.accept();
-        LogInfo("New client! IP: %s\n", new_sock.localIP().toString().c_str());
-
-        struct MyClient *new_client = new struct MyClient;
-
-        new_client->client = new_sock;
-        new_client->connect_time = millis();
-        new_client->data_size = 0;
-        new_client->next = clients;
-        new_client->prev = NULL;
-        clients = new_client;
-    }
-
-    MyClient *now = clients;
-
-    while ( now ) {
-        HandleClient(now);
-
-        now = now->next;
-    }
-}
-
-
-
-
-
-void HandleClient(struct MyClient *_Client) {
-    WiFiClient client = _Client->client;
-
-    if ( !client.connected() ) {
-        LogInfo("Client disconnected. IP: %s\n", client.localIP().toString().c_str());
-        DeleteClient(_Client);
-        return;
-    }
-
-    if ( _Client->data_size == 0 ) {
-        if ( client.available() < 2 ) {
+void HandleAPIServer() {
+    LogTrace("Handle API server");
+    
+    if ( data_size == 0 ) {
+        if ( socket_client.available() < 2 ) {
             return;
         }
 
-        client.read((uint8_t*)&_Client->data_size, 2);
-        _Client->request_time = millis();
+        socket_client.read((uint8_t*)&data_size, 2);
 
-        LogTrace("New data (size: %i)\n", _Client->data_size);
+        LogTrace("New data (size: %i)", data_size);
     }
 
-    if ( client.available() < _Client->data_size ) {
-        if ( millis() - _Client->request_time > MAX_REQUEST_TIMEOUT ) {
-            LogInfo("Too big request time, deleting client. IP: %s\n", client.localIP().toString().c_str());
-            DeleteClient(_Client);
-        }
-
+    if ( socket_client.available() < data_size ) {
         return;
     }
 
     uint8_t buffer[64];
 
-    client.read(buffer, _Client->data_size);
+    socket_client.read(buffer, data_size);
+    LogTrace("Read data");
     
-    _Client->data_size--;
-    HandleData(buffer[0], buffer+1, _Client);
-    _Client->data_size = 0;
+    data_size--;
+    HandleData(buffer[0], buffer+1);
+    data_size = 0;
 }   
 
 
 
-void HandleData(uint8_t event, uint8_t *data, MyClient *_Client) {
-    LogDebug("Handle data. Event %i\n", event);
+void HandleData(uint8_t event, uint8_t *data) {
+    LogDebug("Handle data. Event %i", event);
     
     switch (event) {
         case SERVER_SET_MOTORS_SPEED:
-            if ( _Client->data_size < 2 * sizeof(float)) {
+            if ( data_size < 2 * sizeof(float)) {
                 break;
             }
             WheelsSetSpeed(((float*)data)[0], ((float*)data)[1]);
             break;
 
         case SERVER_SET_LIFT_HEIGHT:
-            if ( _Client->data_size < sizeof(float)) {
+            if ( data_size < sizeof(uint16_t)) {
                 break;
             }
-            LiftSetTarget(*(float*)data);
+            LiftSetTarget(*(uint16_t*)data);
             break;
 
         case SERVER_SET_SERVO_STATE:
-            if ( _Client->data_size < 4 ) {
+            if ( data_size < 4 ) {
                 break;
             }
             ServoSetTarget(data);
             break;
 
         case SERVER_SET_ODOMETRY:
-            if ( _Client->data_size < 3 * sizeof(float)) {
+            if ( data_size < 3 * sizeof(float)) {
                 break;
             }
             SetOdometry(((float*)data)[0], ((float*)data)[1], ((float*)data)[2]);
@@ -190,19 +135,19 @@ void HandleData(uint8_t event, uint8_t *data, MyClient *_Client) {
             NEW_MSG(SERVER_ANSWER_GET_MOTORS_SPEED);
             SET_SEND_DATA(float, wheel_speed_linear);
             SET_SEND_DATA(float, wheel_speed_angular);
-            SEND_MSG(_Client->client);
+            SEND_MSG();
             break;
 
         case SERVER_GET_LIFT_HEIGHT:
             NEW_MSG(SERVER_ANSWER_GET_LIFT_HEIGHT);
-            SET_SEND_DATA(float, LiftGetHeight());
-            SEND_MSG(_Client->client);
+            SET_SEND_DATA(uint16_t, LiftGetHeight());
+            SEND_MSG();
             break;
 
         case SERVER_GET_SERVO_STATE:
             NEW_MSG(SERVER_ANSWER_GET_SERVO_STATE);
             SET_SEND_DATA(uint32_t, *(uint32_t*)ServoGetCurrentPos());
-            SEND_MSG(_Client->client);
+            SEND_MSG();
             break;
 
         case SERVER_GET_ODOMETRY:
@@ -210,7 +155,7 @@ void HandleData(uint8_t event, uint8_t *data, MyClient *_Client) {
             SET_SEND_DATA(float, theta);
             SET_SEND_DATA(float, xPos);
             SET_SEND_DATA(float, yPos);
-            SEND_MSG(_Client->client);
+            SEND_MSG();
             break;
 
         case SERVER_GET_ALL:
@@ -227,35 +172,9 @@ void HandleData(uint8_t event, uint8_t *data, MyClient *_Client) {
             SET_SEND_DATA(float, xPos);
             SET_SEND_DATA(float, yPos);
 
-            SEND_MSG(_Client->client);
+            SEND_MSG();
             break;
     }
-}
-
-
-uint32_t lidar_send_timer = 0;
-
-void ServerSendLidar(uint8_t *buffer, int length) {
-    if ( millis() - lidar_send_timer < 300 ) {
-        return;
-    }
-
-    struct MyClient *now = clients;
-
-    uint8_t send_buf[3];
-    *(uint16_t*)send_buf = length + 1;
-    send_buf[2] = SERVER_SEND_LIDAR;
-
-    while ( now ) {
-        LogTrace("Sending lidar to %s\n", now->client.localIP().toString().c_str());
-        now->client.write(send_buf, 3);
-        now->client.write(buffer, length);
-
-        now = now->next;
-    }
-
-    LogTrace("End sending lidar\n");
-    lidar_send_timer = millis();
 }
 
 

@@ -62,8 +62,11 @@ class Esp32_Bridge(Node):
         self.port = self.get_parameter("port").value
         
         # Connecting to server
-        self.client = EspClientApi.EspClient(self.host, self.port, self.get_logger().info)
-        self.client.connect(self.client.password)
+        self.esp_client = EspClientApi.EspClient(self.host, self.port, self.get_logger().info)
+        self.esp_client.connect(self.esp_client.password)
+
+        self.lidar_client = EspClientApi.LidarClient(self.host, self.port, self.get_logger().info)
+        self.lidar_client.connect()
         
         # Ping server
         self.ping_timer = self.create_timer(0.1, self.ping_esp)
@@ -185,17 +188,17 @@ class Esp32_Bridge(Node):
      
      
     def receive_motors_speed(self, msg):
-        self.client.set_motors_speed(msg.linear.x, msg.angular.z)
+        self.esp_client.set_motors_speed(msg.linear.x, msg.angular.z)
         
     def receive_lift_height(self, msg):
         if msg.data < 0:
             msg.data = 0.0
             
-        self.client.set_lift_height(msg.data)
+        self.esp_client.set_lift_height(msg.data)
         
         
     def receive_servo_state(self, msg):
-        self.client.set_servo_state(msg.data[0], msg.data[1], msg.data[2], msg.data[3])
+        self.esp_client.set_servo_state(msg.data[0], msg.data[1], msg.data[2], msg.data[3])
         
         
         
@@ -263,7 +266,7 @@ class Esp32_Bridge(Node):
     
     def ping_esp(self):
         try:
-            self.client.get_all()
+            self.esp_client.get_all()
         except Exception as e:
             self.get_logger().error("Couldn`t send message:" + str(e))
             
@@ -297,7 +300,7 @@ class Esp32_Bridge(Node):
         self.scan_pub.publish(scan)
         
     def receive_esp_data(self):
-        msg = self.client.receive_msg()
+        msg = self.esp_client.receive_msg()
         
         while msg:
             match msg['event']:
@@ -345,13 +348,16 @@ class Esp32_Bridge(Node):
                     self.publish_servo()
                     self.publish_lift_h()
                     
-                case 'SEND_LIDAR':
-                    self.publish_lidar(msg["angles"], msg["ranges"], msg["intens"])
-                    
                 case _:
                     self.get_logger().warn("Undefine event type:", msg['event'])
    
-            msg = self.client.receive_msg()
+            msg = self.esp_client.receive_msg()
+
+        msg = self.lidar_client.receive_lidar()
+        if msg == None:
+            return
+        
+        self.publish_lidar(msg['angles'], msg['ranges'], msg['intens'])
                 
 
 def main(args=None):

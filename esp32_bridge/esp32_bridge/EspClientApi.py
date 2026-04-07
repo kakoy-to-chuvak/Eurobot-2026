@@ -1,17 +1,10 @@
 import socket
 import struct
-import time
 
 
 
-def crc16(buf: bytes, crc: int = 0xFFFF) -> int:
-    """Modbus-совместимый CRC-16"""
-    for b in buf:
-        crc ^= b
-        for _ in range(8):
-            crc = (crc >> 1) ^ (0xA001 if crc & 1 else 0)
-    return crc & 0xFFFF
-    
+
+
 
 class EspClient():
     
@@ -32,8 +25,6 @@ class EspClient():
         "SET_LIFT_HEIGHT"            : 72,
         "SET_SERVO_STATE"            : 73,
         "SET_ODOMETRY"               : 74,
-        
-        "SEND_LIDAR"                 : 110,
     }
 
     password = "374tfb39784"
@@ -48,12 +39,6 @@ class EspClient():
         self.received_msgs = 0
         
         self.data_size = 0
-        
-        # Lidar parameters
-        self.FRAME_SIZE = 20
-        self.FRAME_FORMAT = "<HHHHHHHHHH" # 20B – угол начала, угол конца, 8×дистанция
-        self.CRC_SIZE = 2
-        self.MAX_PKGS = 200 # max packages per rev
        
     def connect(self, password: str, timeout=1.0):
         self.__client.settimeout(timeout)
@@ -66,10 +51,7 @@ class EspClient():
         self.__client.setblocking(False)
         
     def disconnect(self) -> None:
-        try:
-            self.__client.close()
-        except Exception as e:
-            self.log(e)
+        self.__client.close()
         
     def create_msg(self, type: str, format: str, *args):
         data = struct.pack("<b" + format, self.message_types[type], *args)
@@ -92,37 +74,6 @@ class EspClient():
             return len(self.__client.recv(4000, socket.MSG_PEEK))
         except:
             return 0
-    
-    def convert_lidar(self, raw: bytes):
-        package_len = len(raw) // self.FRAME_SIZE
-        if package_len < 38:  # < ~270°
-            return None
-
-        angles, ranges, intens = [], [], []
-        prev = None
-        off = 0.0
-
-        for i in range(package_len):
-            start, end, *dist = struct.unpack_from(self.FRAME_FORMAT, raw, i * self.FRAME_SIZE)
-            
-            start /= 100.0
-            end   /= 100.0
-            
-            if end< start:
-                end += 360.0
-
-            for j, d in enumerate(dist):
-                a = start + ( end - start ) * j / 7
-                if prev is not None and a + off < prev - 300:
-                    off += 360.0
-                a += off
-                prev = a
-
-                angles.append(a)
-                ranges.append(d / 1000.0 if d else float("inf"))
-                intens.append(1.0 if d else 0.0)
-                
-        return (angles, ranges, intens)
         
         
     def receive_msg(self):
@@ -204,25 +155,6 @@ class EspClient():
                     }
                 }
                 
-            case "SEND_LIDAR":
-                # Check for wrong data
-                if not ( self.FRAME_SIZE + self.CRC_SIZE <= len(bin_data) <= self.MAX_PKGS * self.FRAME_SIZE + self.CRC_SIZE ):
-                    return None
-                if crc16(bin_data[:-2]) != int.from_bytes(bin_data[-2:], "little"):
-                    return None
-                
-                lidar_data = self.convert_lidar(bin_data[:-2])
-
-                if lidar_data == None:
-                    return None
-                
-                return {
-                    "event": event,
-                    "angles": lidar_data[0],
-                    "ranges": lidar_data[1],
-                    "intens": lidar_data[2],
-                }
-                
             case _:
                 self.log(f"Undefined event: {str(event)}")
                 return None
@@ -262,3 +194,98 @@ class EspClient():
         
     def get_all(self):
         self.send_msg("GET_ALL", "")
+
+
+
+
+def crc16(buf: bytes, crc: int = 0xFFFF) -> int:
+    """Modbus-совместимый CRC-16"""
+    for b in buf:
+        crc ^= b
+        for _ in range(8):
+            crc = (crc >> 1) ^ (0xA001 if crc & 1 else 0)
+    return crc & 0xFFFF
+    
+
+
+
+class LidarClient:
+    def __init__(self, host, port, log_function = print):
+        self.host = host
+        self.port = port
+        self.log = log_function
+
+        self.__client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sended_msgs = 0
+        self.received_msgs = 0
+
+        # Lidar parameters
+        self.FRAME_SIZE = 20
+        self.FRAME_FORMAT = "<HHHHHHHHHH" # 20B – угол начала, угол конца, 8×дистанция
+        self.CRC_SIZE = 2
+        self.MAX_PKGS = 200 # max packages per rev
+
+    def connect(self, password: str, timeout=1.0):
+        self.__client.settimeout(timeout)
+        self.__client.setblocking(True)
+        
+        self.log(f"Connecting to server {self.host}:{self.port}")
+        self.__client.sendto("connect str", (self.host, self.port))
+        self.log("Connected!")
+            
+        self.__client.setblocking(False)
+
+    def convert_lidar(self, raw: bytes):
+        package_len = len(raw) // self.FRAME_SIZE
+        if package_len < 38:  # < ~270°
+            return None
+
+        angles, ranges, intens = [], [], []
+        prev = None
+        off = 0.0
+
+        for i in range(package_len):
+            start, end, *dist = struct.unpack_from(self.FRAME_FORMAT, raw, i * self.FRAME_SIZE)
+            
+            start /= 100.0
+            end   /= 100.0
+            
+            if end< start:
+                end += 360.0
+
+            for j, d in enumerate(dist):
+                a = start + ( end - start ) * j / 7
+                if prev is not None and a + off < prev - 300:
+                    off += 360.0
+                a += off
+                prev = a
+
+                angles.append(a)
+                ranges.append(d / 1000.0 if d else float("inf"))
+                intens.append(1.0 if d else 0.0)
+                
+        return (angles, ranges, intens)
+    
+    def receive_lidar(self):
+        try:
+            bin_data = self.__client.recv(self.FRAME_SIZE)
+        except BlockingIOError:
+            return None
+        
+        # Check for wrong data
+        if not ( self.FRAME_SIZE + self.CRC_SIZE <= len(bin_data) <= self.MAX_PKGS * self.FRAME_SIZE + self.CRC_SIZE ):
+            return None
+        
+        if crc16(bin_data[:-2]) != int.from_bytes(bin_data[-2:], "little"):
+            return None
+                
+        lidar_data = self.convert_lidar(bin_data[:-2])
+
+        if lidar_data == None:
+            return None
+                
+        return {
+            "angles": lidar_data[0],
+            "ranges": lidar_data[1],
+            "intens": lidar_data[2],
+        }
