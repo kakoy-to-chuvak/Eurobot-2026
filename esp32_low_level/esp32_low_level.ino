@@ -8,8 +8,11 @@
 
 // Wifi
 #define SSID "robotx"
-#define PASSWORD "78910442"
+#define PASSWORD "78914040"
 
+#define CREATE_ACCESS 0
+#define MY_SSID "my_robotx"
+#define MY_PASSWORD "my_78914040"
 
 
 uint32_t server_timer = 0;
@@ -33,13 +36,25 @@ void setup() {
     LogDebug("Setup servo\n");
     SetupServo();
 
+#if CREATE_ACCESS
     // Creating access point
-    LogInfo("Creating acces point \"%s\"\n", SSID);
-    WiFi.softAP(SSID, PASSWORD);
+    LogInfo("Creating acces point \"%s\"\n", MY_SSID);
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAP(MY_SSID, MY_PASSWORD);
     delay(200);
     
     // Get ip of access point
     LogInfo("Created! IP: %s\n", WiFi.softAPIP().toString().c_str());
+#else
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(SSID, PASSWORD);
+    Serial.print("Connecting to WiFi");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(300);
+        Serial.print('.');
+    }
+    Serial.println("\nConnected!\nIP: " + WiFi.localIP().toString());
+#endif
 
     LogDebug("Starting server\n");
     SetupServer();

@@ -34,6 +34,4 @@ void ComputeOdometry() {
 
     prev_current_l = current_l;
     prev_current_r = current_r;
-
-    odometry_timer = millis();
 }

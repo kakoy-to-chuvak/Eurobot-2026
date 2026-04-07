@@ -43,7 +43,7 @@ constexpr uint16_t SERVO_DELAY = 1000 / SERVO_SPEED; // delay between calls
 
 
 // ==== Debug ====
-#define LOGGING 0
+#define LOGGING -1
 
 #if LOGGING <= 0
 #   define LogInfo(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)

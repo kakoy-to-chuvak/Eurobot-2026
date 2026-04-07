@@ -11,7 +11,7 @@ const uint8_t servosLimits[4][2] = {
     { 95,  5   },
     { 104, 14  },
     { 79,  169 },
-    { 88,  178 },
+    { 78,  168 },
 };
 
 uint8_t servosTargetPos[4]  = { servosLimits[0][1], servosLimits[1][1], servosLimits[2][1], servosLimits[3][1] };

@@ -64,7 +64,6 @@ class Esp32_Bridge(Node):
         # Connecting to server
         self.client = EspClientApi.EspClient(self.host, self.port, self.get_logger().info)
         self.client.connect(self.client.password)
-        self.client.set_mode_lidar(True)
         
         # Ping server
         self.ping_timer = self.create_timer(0.1, self.ping_esp)
@@ -268,7 +267,7 @@ class Esp32_Bridge(Node):
         except Exception as e:
             self.get_logger().error("Couldn`t send message:" + str(e))
             
-    def publish_lidar(self, angles, ranges, intens):
+    def publish_lidar(self, angles, ranges, intens):        
         if self.get_parameter("lidar_mirror").value:
             angles.reverse()
             ranges.reverse()

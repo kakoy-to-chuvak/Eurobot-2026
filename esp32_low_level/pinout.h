@@ -25,7 +25,7 @@
 #define SERVO_0 32
 #define SERVO_1 33
 #define SERVO_2 15
-#define SERVO_3 2
+#define SERVO_3 17
 const int SERVO_PINS[4] = { SERVO_0, SERVO_1, SERVO_2, SERVO_3 };
 
 // Lidar

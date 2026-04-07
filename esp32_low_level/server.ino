@@ -22,18 +22,18 @@ int buffer_counter;
 // Server events
 #define SERVER_GET_ALL 10
 #define SERVER_GET_MOTORS_SPEED 11
-#define SERVER_GET_LIFT_HEIGH   12
+#define SERVER_GET_LIFT_HEIGHT  12
 #define SERVER_GET_SERVO_STATE  13
 #define SERVER_GET_ODOMETRY     14
 
 #define SERVER_ANSWER_GET_ALL 40
 #define SERVER_ANSWER_GET_MOTORS_SPEED 41
-#define SERVER_ANSWER_GET_LIFT_HEIGH   42
+#define SERVER_ANSWER_GET_LIFT_HEIGHT  42
 #define SERVER_ANSWER_GET_SERVO_STATE  43
 #define SERVER_ANSWER_GET_ODOMETRY     44
 
 #define SERVER_SET_MOTORS_SPEED 71
-#define SERVER_SET_LIFT_HEIGH   72
+#define SERVER_SET_LIFT_HEIGHT  72
 #define SERVER_SET_SERVO_STATE  73
 #define SERVER_SET_ODOMETRY     74
 
@@ -55,7 +55,7 @@ struct MyClient {
 
 
 WiFiServer server(SERVER_PORT);
-MyClient *clients = NULL;
+struct MyClient *clients = NULL;
 int now_id = 0;
 
 
@@ -74,8 +74,6 @@ void DeleteClient(struct MyClient *_Client) {
     } else {
         clients = _Client->next;
     }
-
-    free(_Client);
 }
  
 
@@ -93,12 +91,13 @@ void HandleServer() {
         WiFiClient new_sock = server.accept();
         LogInfo("New client! IP: %s\n", new_sock.localIP().toString().c_str());
 
-        struct MyClient *new_client = (struct MyClient*)calloc(1, sizeof(struct MyClient));
+        struct MyClient *new_client = new struct MyClient;
 
         new_client->client = new_sock;
         new_client->connect_time = millis();
-
+        new_client->data_size = 0;
         new_client->next = clients;
+        new_client->prev = NULL;
         clients = new_client;
     }
 
@@ -156,7 +155,7 @@ void HandleClient(struct MyClient *_Client) {
 
 
 void HandleData(uint8_t event, uint8_t *data, MyClient *_Client) {
-    LogTrace("Handle data. EventL %i", event);
+    LogDebug("Handle data. Event %i\n", event);
     
     switch (event) {
         case SERVER_SET_MOTORS_SPEED:
@@ -166,7 +165,7 @@ void HandleData(uint8_t event, uint8_t *data, MyClient *_Client) {
             WheelsSetSpeed(((float*)data)[0], ((float*)data)[1]);
             break;
 
-        case SERVER_SET_LIFT_HEIGH:
+        case SERVER_SET_LIFT_HEIGHT:
             if ( _Client->data_size < sizeof(float)) {
                 break;
             }
@@ -194,8 +193,8 @@ void HandleData(uint8_t event, uint8_t *data, MyClient *_Client) {
             SEND_MSG(_Client->client);
             break;
 
-        case SERVER_GET_LIFT_HEIGH:
-            NEW_MSG(SERVER_ANSWER_GET_LIFT_HEIGH);
+        case SERVER_GET_LIFT_HEIGHT:
+            NEW_MSG(SERVER_ANSWER_GET_LIFT_HEIGHT);
             SET_SEND_DATA(float, LiftGetHeight());
             SEND_MSG(_Client->client);
             break;
@@ -233,7 +232,14 @@ void HandleData(uint8_t event, uint8_t *data, MyClient *_Client) {
     }
 }
 
+
+uint32_t lidar_send_timer = 0;
+
 void ServerSendLidar(uint8_t *buffer, int length) {
+    if ( millis() - lidar_send_timer < 300 ) {
+        return;
+    }
+
     struct MyClient *now = clients;
 
     uint8_t send_buf[3];
@@ -241,10 +247,15 @@ void ServerSendLidar(uint8_t *buffer, int length) {
     send_buf[2] = SERVER_SEND_LIDAR;
 
     while ( now ) {
-        LogTrace("Sending lidar to %s", now->client.localIP().toString().c_str());
+        LogTrace("Sending lidar to %s\n", now->client.localIP().toString().c_str());
         now->client.write(send_buf, 3);
         now->client.write(buffer, length);
+
+        now = now->next;
     }
+
+    LogTrace("End sending lidar\n");
+    lidar_send_timer = millis();
 }
 
 

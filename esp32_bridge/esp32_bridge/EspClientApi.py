@@ -16,21 +16,24 @@ def crc16(buf: bytes, crc: int = 0xFFFF) -> int:
 class EspClient():
     
     message_types = {
-        "GET_ALL"                    = 10,
-        "GET_MOTORS_SPEED"           = 11,
-        "GET_LIFT_HEIGH"             = 12,
-        "GET_SERVO_STATE"            = 13,
-        "GET_ODOMETRY"               = 14,
-        "ANSWER_GET_ALL"             = 40,
-        "ANSWER_GET_MOTORS_SPEED"    = 41,
-        "ANSWER_GET_LIFT_HEIGH"      = 42,
-        "ANSWER_GET_SERVO_STATE"     = 43,
-        "ANSWER_GET_ODOMETRY"        = 44,
-        "SET_MOTORS_SPEED"           = 71,
-        "SET_LIFT_HEIGH"             = 72,
-        "SET_SERVO_STATE"            = 73,
-        "SET_ODOMETRY"               = 74,
-        "SEND_LIDAR"                 = 110,
+        "GET_ALL"                    : 10,
+        "GET_MOTORS_SPEED"           : 11,
+        "SET_LIFT_HEIGHT"            : 12,
+        "GET_SERVO_STATE"            : 13,
+        "GET_ODOMETRY"               : 14,
+        
+        "ANSWER_GET_ALL"             : 40,
+        "ANSWER_GET_MOTORS_SPEED"    : 41,
+        "ANSWER_GET_LIFT_HEIGHT"     : 42,
+        "ANSWER_GET_SERVO_STATE"     : 43,
+        "ANSWER_GET_ODOMETRY"        : 44,
+        
+        "SET_MOTORS_SPEED"           : 71,
+        "SET_LIFT_HEIGHT"            : 72,
+        "SET_SERVO_STATE"            : 73,
+        "SET_ODOMETRY"               : 74,
+        
+        "SEND_LIDAR"                 : 110,
     }
 
     password = "374tfb39784"
@@ -127,7 +130,10 @@ class EspClient():
             if self.available() < 2:
                 return None
             self.data_size = struct.unpack("<H", self.__client.recv(2))[0]
-            return False
+            if self.data_size > 3000:
+                self.log(f"Too big data size: {self.data_size}")
+                self.data_size = 0
+                return None
             
         if self.available() < self.data_size:
             return None
@@ -136,7 +142,13 @@ class EspClient():
         self.data_size = 0
         
         event_type = struct.unpack("<b", bin_data[:1])[0]
-        event = list(self.message_types.keys())[list(self.message_types.values()).index(event_type)]
+        
+        try:
+            event = list(self.message_types.keys())[list(self.message_types.values()).index(event_type)]
+        except ValueError:
+            self.log(f"Undefined event type {event_type}")
+            return None
+            
         self.received_msgs += 1
         bin_data = bin_data[1:]
         
@@ -212,11 +224,8 @@ class EspClient():
                 }
                 
             case _:
-                self.log("Undefined event:", event)
+                self.log(f"Undefined event: {str(event)}")
                 return None
-    
-    def set_mode_lidar(self, mode: bool):
-        self.send_msg("SET_MODE_LIDAR", "B", int(mode))
 
     def set_motors_speed(self, linear_x: float = 0.0, angular_z: float = 0.0) -> None:
         self.send_msg("SET_MOTORS_SPEED", "ff", linear_x, angular_z)
