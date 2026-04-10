@@ -34,7 +34,7 @@ const int SERVO_PINS[4] = { SERVO_0, SERVO_1, SERVO_2, SERVO_3 };
 
 // Other
 #define STARTER 0
-#define SIDE_SWITCH 2
+#define SIDE_SWITCH 21
 
 
 

@@ -76,9 +76,9 @@ void loop() {
 
     WheelsTick();
     LiftTick();
-    ServoPosControl();
 
     if ( current_time - servo_timer > SERVO_DELAY ) {
+        ServoPosControl();
         servo_timer = current_time;
     }
 
@@ -93,6 +93,7 @@ void loop() {
         tps = tps_counter;
         tps_counter = 0;
         tps_timer = millis();
+        LogDebug("TPS: %lu", tps);
     }
 }
 

@@ -19,8 +19,8 @@
 constexpr float WHEEL_STEPS_PER_M = (float)WHEEL_STEPS_PER_REV / ( 2.0f * M_PI * WHEEL_R );
 
 // Lift
-#define LIFT_MIN_POSITION 0.0    // mm
-#define LIFT_MAX_POSITION 200.0  // mm
+#define LIFT_MIN_POSITION 0    // mm
+#define LIFT_MAX_POSITION 200  // mm
 
 #define LIFT_STEPS_PER_REV 800
 #define LIFT_R_MM_PER_REV 16.05 
@@ -34,8 +34,13 @@ constexpr uint16_t LIFT_R_STEPS_PER_MM = LIFT_STEPS_PER_REV / LIFT_R_MM_PER_REV 
 #define SERVO_SPEED 200  // degree per second
 constexpr uint16_t SERVO_DELAY = 1000 / SERVO_SPEED; // delay between calls
 
-#define SERVER_DELAY   50 // delay between calls
-#define ODOMETRY_DELAY 10 // delay between calls
+#define SERVER_DELAY   5 // delay between calls
+#define ODOMETRY_DELAY 5 // delay between calls
+
+
+
+
+
 
 
 

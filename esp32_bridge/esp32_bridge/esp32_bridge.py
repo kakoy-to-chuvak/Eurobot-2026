@@ -10,7 +10,7 @@ import rclpy
 from rclpy.node import Node
 
 # Messages
-from std_msgs.msg import UInt8MultiArray, Float32
+from std_msgs.msg import UInt8MultiArray, UInt16
 from geometry_msgs.msg import Twist, Quaternion
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
@@ -60,12 +60,15 @@ class Esp32_Bridge(Node):
         
         self.declare_parameter("port", 8080)
         self.port = self.get_parameter("port").value
+
+        self.declare_parameter("lidar_port", 8080)
+        self.lidar_port = self.get_parameter("lidar_port").value
         
         # Connecting to server
         self.esp_client = EspClientApi.EspClient(self.host, self.port, self.get_logger().info)
         self.esp_client.connect(self.esp_client.password)
 
-        self.lidar_client = EspClientApi.LidarClient(self.host, self.port, self.get_logger().info)
+        self.lidar_client = EspClientApi.LidarClient(self.host, self.lidar_port, self.get_logger().info)
         self.lidar_client.connect()
         
         # Ping server
@@ -86,7 +89,7 @@ class Esp32_Bridge(Node):
         self.theta = 0.0
         
         self.servo_state = (0, 0, 0, 0)
-        self.lift_height = 0.0
+        self.lift_height = 0
 
         # Frame names
         self.declare_parameter("odom_frame", "pwb_odom")
@@ -135,14 +138,14 @@ class Esp32_Bridge(Node):
         
         # ROS publishers
         self.odom_publisher = self.create_publisher(Odometry, "/pwb/odom", 10)
-        self.lift_h_pub = self.create_publisher(Float32, '/pwb/lift_current_height', 10)
+        self.lift_h_pub = self.create_publisher(UInt16, '/pwb/lift_current_height', 10)
         self.servo_pos_pub = self.create_publisher(UInt8MultiArray, '/pwb/servos_current_angles', 10)
         self.scan_pub = self.create_publisher(LaserScan, "/pwb/lidar_scan", 10)
         
         
         # ROS subscriptions
         self.cmd_vel_sub = self.create_subscription(Twist, '/pwb/cmd_vel', self.receive_motors_speed, 10)
-        self.lift_h_sub = self.create_subscription(Float32, '/pwb/lift_target_height', self.receive_lift_height, 10)
+        self.lift_h_sub = self.create_subscription(UInt16, '/pwb/lift_target_height', self.receive_lift_height, 10)
         self.servo_pos_sub = self.create_subscription(UInt8MultiArray, '/pwb/servos_target_angles', self.receive_servo_state, 10)
         
         
@@ -198,7 +201,7 @@ class Esp32_Bridge(Node):
         
         
     def receive_servo_state(self, msg):
-        self.esp_client.set_servo_state(msg.data[0], msg.data[1], msg.data[2], msg.data[3])
+        self.esp_client.set_servo_state(msg.data)
         
         
         
@@ -258,8 +261,8 @@ class Esp32_Bridge(Node):
         self.servo_pos_pub.publish(servo)
         
     def publish_lift_h(self):
-        lift = Float32()
-        lift.data = float(self.lift_height)
+        lift = UInt16()
+        lift.data = int(self.lift_height)
         
         self.lift_h_pub.publish(lift)
         

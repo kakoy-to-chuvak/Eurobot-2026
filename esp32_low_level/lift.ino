@@ -40,9 +40,9 @@ inline void LiftSetTarget(uint16_t _Height_mm) {
     lift_r.setTarget(lift_target_height * LIFT_R_STEPS_PER_MM, ABSOLUTE);
 }
 
-float LiftGetHeight() {
+uint16_t LiftGetHeight() {
     LogTrace("Get lift height");
-    return ( lift_l.getCurrent() / LIFT_L_STEPS_PER_MM + lift_r.getCurrent() / LIFT_R_STEPS_PER_MM ) / 2.0;
+    return ( lift_l.getCurrent() / LIFT_L_STEPS_PER_MM + lift_r.getCurrent() / LIFT_R_STEPS_PER_MM ) / 2;
 }
 
 inline void LiftTick() {

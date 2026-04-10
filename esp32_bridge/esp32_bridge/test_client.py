@@ -40,8 +40,7 @@ def handle_input():
         run = False
         return
 
-thread = threading.Thread(target=handle_input)
-thread.start()
+
 
 # testing response
 client.get_odometry()
@@ -49,6 +48,9 @@ client.get_motors_speed()
 client.get_lift_height()
 client.get_servo_state()
 client.get_all()
+
+thread = threading.Thread(target=handle_input)
+thread.start()
 
 while run:
     data = client.receive_msg()

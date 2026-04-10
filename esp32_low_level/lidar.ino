@@ -37,14 +37,8 @@ void StartUdpServer() {
         vTaskDelay(10);
     }
 
-    LogInfo("UDP client connected");
-
-    uint8_t data[32];
-    // read data
-    udp_server.read(data, 32);
-
     udp_client_ip = udp_server.remoteIP();
-    LogInfo("UDP client registred! IP: %s", udp_client_ip.toString().c_str());
+    LogInfo("UDP client connected! IP: %s", udp_client_ip.toString().c_str());
 }
 
 // ==== Helper lidar functions ====
@@ -103,6 +97,11 @@ void LidarTask(void *_Param) {
     
     while (true) {
         vTaskDelay(1);
+
+        if ( udp_server.parsePacket() ) {
+            udp_client_ip = udp_server.remoteIP();
+            LogInfo("New UDP client connected! IP: %s", udp_client_ip.toString().c_str());
+        }
 
         if ( !waitLidarHeader(Serial2) || !readBytes(Serial2, body, BODY_LEN) ) {
             continue;

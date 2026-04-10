@@ -14,7 +14,7 @@ linear = 0
 tgt_height = 0
 cur_height = 0
 
-lift_speed = 80 # mm per sec
+lift_speed = 160 # mm per sec
 lift_timer = 0
 
 # Servos
@@ -28,7 +28,7 @@ servo_timer = 0
 
 # Lidar simulation
 lidar_timer = 0
-lidar_delay = 0.5
+lidar_delay = 0.05
 
 # Odometry
 xPos = 0.0
@@ -107,73 +107,75 @@ def get_time():
 
 
 # -------------------------- Server client class --------------------------
-class MyClient:
-    receive_lidar = 0
-    
+class SocketClient:
     socket_client = None
     data_size = 0
-    request_time = 0
     
     def __init__(self, socket_client: socket.socket):
         self.socket_client = socket_client
-        self.connect_time = time.perf_counter()
         self.socket_client.setblocking(False)
         self.connected = True
     
     def send_msg(self, type: str, format: str, *args) -> None:
-        data = struct.pack("<b" + format, type, *args)
+        data = struct.pack("<b" + format, EspClient.message_types[type], *args)
         data = struct.pack("<H", len(data)) + data
         
         self.socket_client.sendall(data)
-        
         
     def handle_client(self):
         if self.data_size == 0:
             if self.available() < 2:
                 return
             self.data_size = struct.unpack("<H", self.socket_client.recv(2))[0]
-            self.request_time = time.perf_counter()
             # print(get_time(), "New data:", self.data_size)
-
-        if self.data_size and time.perf_counter() - self.request_time > 0.3:
-            print(get_time(), "Too big request time!")
-            return
-    
     
         if self.available() < self.data_size:
             return 
     
         data = self.socket_client.recv(self.data_size)
-
-        event = struct.unpack("<B", data[:1])[0]
-        #print(get_time(), "Event:", list(EspClient.message_types.keys())[list(EspClient.message_types.values()).index(event)])
         self.data_size = 0
+
+        event_type = struct.unpack("<B", data[:1])[0]
+        #print(get_time(), "Event:", list(EspClient.message_types.keys())[list(EspClient.message_types.values()).index(event)])
+
+        try:
+            event = list(EspClient.message_types.keys())[list(EspClient.message_types.values()).index(event_type)]
+        except ValueError:
+            print(get_time(), f"Undefined event type {event_type}")
+            return None
         
         self.handle_data(event, data[1:])
         
-    def handle_data(self, event_type, data):
+    def handle_data(self, event: str, data: bytes):
         global linear, angular, tgt_height, cur_height, cur_servos, tgt_servos, xPos, yPos, theta
-        match event_type:
-            case 2:
-                self.receive_lidar = struct.unpack("B", data)[0]
-                print(get_time(), "Receive lidar:", self.receive_lidar)
-            case 20:
-                self.send_msg(30, "ff", linear, angular)
-            case 21:
-                self.send_msg(31, "f", cur_height)
-            case 22:
-                self.send_msg(32, "BBBB", cur_servos[0], cur_servos[1], cur_servos[2], cur_servos[3])
-            case 23:
-                self.send_msg(33, "fff", xPos, yPos, theta)
-            case 29:
-                self.send_msg(39, "fffBBBBfff", linear, angular, cur_height, cur_servos[0], cur_servos[1], cur_servos[2], cur_servos[3], xPos, yPos, theta)
-            case 10:
+        match event:
+            case "GET_MOTORS_SPEED":
+                self.send_msg("ANSWER_GET_MOTORS_SPEED", "ff", linear, angular)
+
+            case "GET_LIFT_HEIGHT":
+                self.send_msg("ANSWER_GET_LIFT_HEIGHT", "H", int(cur_height))
+
+            case "GET_SERVO_STATE":
+                self.send_msg("ANSWER_GET_SERVO_STATE", "BBBB", cur_servos[0], cur_servos[1], cur_servos[2], cur_servos[3])
+
+            case "GET_ODOMETRY":
+                self.send_msg("ANSWER_GET_ODOMETRY", "fff", xPos, yPos, theta)
+
+            case "GET_ALL":
+                self.send_msg("ANSWER_GET_ALL", "ffHBBBBfff", linear, angular, int(cur_height), cur_servos[0], cur_servos[1], cur_servos[2], cur_servos[3], xPos, yPos, theta)
+
+            case "SET_MOTORS_SPEED":
                 linear, angular = struct.unpack("ff", data)
-            case 11:
+
+            case "SET_ODOMETRY":
                 xPos, yPos, theta = struct.unpack("fff", data)
-            case 13:
-                tgt_height = struct.unpack("f", data)[0]
-            case 12:
+
+            case "SET_LIFT_HEIGHT":
+                tgt_height = struct.unpack("H", data)[0]
+                if tgt_height >= 200:
+                    tgt_height = 200
+                
+            case "SET_SERVO_STATE":
                 tgt_servos = list(struct.unpack("BBBB", data))
               
                 
@@ -188,35 +190,31 @@ class MyClient:
         except (ConnectionResetError, BrokenPipeError):
             self.connected = False
             return 0
-    
-    def send_lidar(self, data):
-        data = struct.pack("<B", 40) + data + struct.pack("<H", crc16(data))
-        data = struct.pack("<H", len(data)) + data
-        
-        self.socket_client.setblocking(True)
-        self.socket_client.sendall(data)
-        self.socket_client.setblocking(False)
-
 
 # -------------------------- Server --------------------------
 HOST = "127.0.0.1"
 PORT = 8080
-PASSWORD = "374tfb39784"
+LIDAR_PORT = 8090
 
-clients = []
+esp_client = None
 
 last_compute = 0
 run = True
 
 
 # Creating server
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind((HOST, PORT))
-server.listen()
-server.setblocking(False)
-print(get_time(), "Server created!")
+socket_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+socket_server.bind((HOST, PORT))
+socket_server.listen()
+socket_server.setblocking(False)
+print(get_time(), "Socket server created!")
 
 
+udp_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+udp_server.bind((HOST, PORT))
+udp_server.setblocking(False)
+udp_client_ip = None
+print(get_time(), "UDP server created!")
 
 # -------------------------- Robot simulation --------------------------
 def get_angle(point: tuple) -> float:
@@ -360,14 +358,16 @@ def SimulatServo():
 
     servo_timer = time.perf_counter()
 
-def PublishLidar(client: MyClient):
+def PublishLidar():
     global lidar_timer, lidar_delay
 
     if time.perf_counter() - lidar_timer < lidar_delay:
         return
     
-    lidar_pkg = create_lidar_pkg(400)
-    client.send_lidar(lidar_pkg)
+    if udp_client_ip:
+        lidar_pkg = create_lidar_pkg(400)
+        lidar_pkg += struct.pack("<H", crc16(lidar_pkg))
+        udp_server.sendto(lidar_pkg, udp_client_ip)
 
     lidar_timer = time.perf_counter()
 
@@ -375,38 +375,43 @@ def PublishLidar(client: MyClient):
 
 
 # -------------------------- main cycle --------------------------
-while run:
+def main():
+    global udp_server, socket_server, run, esp_client, udp_client_ip
+    while run:
 
-    # Simulate moving
-    ComputeOdometry()
-    SimulatServo()
-    SimulateLift()
+        # Simulate moving
+        ComputeOdometry()
+        SimulatServo()
+        SimulateLift()
+        PublishLidar()
 
-    # handle clients
-    for i, client in enumerate(clients):
-        try:
-            client.handle_client()
-            if not client.connected:
+        if esp_client is not None:
+            # handle client
+            esp_client.handle_client()
+            if not esp_client.connected:
                 print(get_time(), "Clent disconected")
                 print(get_time(), "Deleting client")
-                clients.pop(i)
-                continue
-            elif client.receive_lidar:
-                PublishLidar(client)
-        except KeyboardInterrupt:
-            run = False
+                esp_client = None
+
+        if esp_client is None:
+            # Accepting new client
+            try:
+                new_client, addr = socket_server.accept()        
+                esp_client = SocketClient(new_client)
+                print(get_time(), "New client!")
+            except BlockingIOError:
+                pass
 
 
-    # Accepting new clients
-    try:
-        new_client, addr = server.accept()        
-        clients.append(MyClient(new_client))
-        print(get_time(), "New client!")
-    except KeyboardInterrupt:
-        run = False
+        try:
+            msg, addr = udp_server.recvfrom(32)
+            udp_client_ip = addr
+            print(get_time(), "New udp client:", addr)
 
-    except:
-        pass
+        except:
+            pass
 
 
     
+if __name__ == "__main__":
+    main()

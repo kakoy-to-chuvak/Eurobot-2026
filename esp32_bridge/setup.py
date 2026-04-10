@@ -13,7 +13,7 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Daniil',
+    maintainer='kakoy-to-chuvak',
     maintainer_email='kakoy-to-chuvak@yandex.ru',
     description='TODO: Package description',
     license='TODO: License declaration',
@@ -24,7 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "esp32_bridge = esp32_bridge.esp32_bridge:main"
+            "esp32_bridge = esp32_bridge.esp32_bridge:main",
+            "test_server  = esp32_bridge.test_server:main",
         ],
     },
 )

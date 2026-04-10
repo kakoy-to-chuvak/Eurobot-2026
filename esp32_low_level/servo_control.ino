@@ -21,14 +21,9 @@ uint8_t servosCurrentPos[4] = { servosLimits[0][1], servosLimits[1][1], servosLi
 inline void SetupServo() {
     LogDebug("Setup servo");
 
-    ESP32PWM::allocateTimer(0);
-    ESP32PWM::allocateTimer(1);
-    ESP32PWM::allocateTimer(3);
-    ESP32PWM::allocateTimer(4);
-
     for (int i = 0; i < 4; i++) {
+        servos[i].attach(SERVO_PINS[i]);
         servos[i].setPeriodHertz(50);
-        servos[i].attach(SERVO_PINS[i], 500, 2500);
         servos[i].write(servosCurrentPos[i]);
     }
 }
@@ -52,11 +47,9 @@ inline void ServoSetTarget(uint8_t *_Buffer) {
     
     for ( int i = 0 ; i < 4 ; i++ ) {
         // constrain value
-        if ( _Buffer[i] > 90 ) {
-            _Buffer[i] = 90;
-        }
+        uint8_t value = constrain(_Buffer[i], 0, 90);
 
-        servosTargetPos[i] = map(_Buffer[i], 0, 90, servosLimits[i][0], servosLimits[i][1]);
+        servosTargetPos[i] = map(value, 0, 90, servosLimits[i][0], servosLimits[i][1]);
     }
 };
 

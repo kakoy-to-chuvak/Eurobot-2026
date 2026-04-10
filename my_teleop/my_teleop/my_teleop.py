@@ -2,7 +2,7 @@ import rclpy
 import sys
 
 from geometry_msgs.msg import Twist
-from std_msgs.msg import UInt8MultiArray, Float32
+from std_msgs.msg import UInt8MultiArray, UInt16
 
 if sys.platform == 'win32':
     import msvcrt
@@ -133,7 +133,7 @@ def main(args=None):
     node = rclpy.create_node('my_teleop')
         
     vel_pub   = node.create_publisher(Twist,           '/pwb/cmd_vel', 10)
-    lift_pub  = node.create_publisher(Float32,         '/pwb/lift_target_height', 10)
+    lift_pub  = node.create_publisher(UInt16,          '/pwb/lift_target_height', 10)
     servo_pub = node.create_publisher(UInt8MultiArray, '/pwb/servos_target_angles', 10)
 
     linear = 0.5
@@ -183,8 +183,8 @@ def main(args=None):
                 elif lift_h > 500:
                     lift_h = 500
 
-                float_msg = Float32()
-                float_msg.data = float(lift_h)
+                float_msg = UInt16()
+                float_msg.data = int(lift_h)
                 lift_pub.publish(float_msg)
 
                 print_all(linear, angular, lift_h, servos)

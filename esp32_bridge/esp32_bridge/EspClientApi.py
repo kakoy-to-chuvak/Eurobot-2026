@@ -4,14 +4,19 @@ import struct
 
 
 
-
+def constrain(a, min_value, max_value):
+    if a < min_value:
+        return min_value
+    if a > max_value:
+        return max_value
+    return a
 
 class EspClient():
     
     message_types = {
         "GET_ALL"                    : 10,
         "GET_MOTORS_SPEED"           : 11,
-        "SET_LIFT_HEIGHT"            : 12,
+        "GET_LIFT_HEIGHT"            : 12,
         "GET_SERVO_STATE"            : 13,
         "GET_ODOMETRY"               : 14,
         
@@ -90,6 +95,7 @@ class EspClient():
             return None
             
         bin_data = self.__client.recv(self.data_size)
+        self.received_msgs += 1
         self.data_size = 0
         
         event_type = struct.unpack("<b", bin_data[:1])[0]
@@ -105,7 +111,7 @@ class EspClient():
         
         match event:
             case "ANSWER_GET_MOTORS_SPEED":
-                data = struct.unpack("ff", bin_data)
+                data = struct.unpack("<ff", bin_data)
                 return {
                     "event"   : event,
                     "linear"  : data[0],
@@ -113,21 +119,21 @@ class EspClient():
                 }
                 
             case "ANSWER_GET_LIFT_HEIGHT":
-                data = struct.unpack("f", bin_data)
+                data = struct.unpack("<H", bin_data)
                 return {
                     "event"  : event,
                     "height" : data[0],
                 }
                 
             case "ANSWER_GET_SERVO_STATE":
-                data = struct.unpack("BBBB", bin_data)
+                data = struct.unpack("<BBBB", bin_data)
                 return {
                     "event" : event,
                     "state" : data
                 }
                 
             case "ANSWER_GET_ODOMETRY":
-                data = struct.unpack("fff", bin_data)
+                data = struct.unpack("<fff", bin_data)
                 return {
                     "event" : event,
                     "x"     : data[0],
@@ -136,7 +142,7 @@ class EspClient():
                 }
                 
             case "ANSWER_GET_ALL":
-                data = struct.unpack("fffBBBBfff", bin_data)
+                data = struct.unpack("<ffHBBBBfff", bin_data)
                 return {
                     "event" : event,
                     "motors_speed": {
@@ -162,20 +168,14 @@ class EspClient():
     def set_motors_speed(self, linear_x: float = 0.0, angular_z: float = 0.0) -> None:
         self.send_msg("SET_MOTORS_SPEED", "ff", linear_x, angular_z)
         
-    def set_lift_height(self, height: float) -> None:
-        self.send_msg("SET_LIFT_HEIGHT", "f", height)
+    def set_lift_height(self, height: int) -> None:
+        self.send_msg("SET_LIFT_HEIGHT", "H", constrain(height, 0, 10101))
         
-    def set_servo_state(self, ang0: int = 0, ang1: int = 0, ang2: int = 0, ang3: int = 0) -> None:
-        
-        try:
-            self.send_msg("SET_SERVO_STATE", "BBBB", ang0, ang1, ang2, ang3)
-        except:
-            pass
+    def set_servo_state(self, angles) -> None:
+        self.send_msg("SET_SERVO_STATE", "BBBB", constrain(angles[0], 0, 255), constrain(angles[1], 0, 255), constrain(angles[2], 0, 255), constrain(angles[3], 0, 255))
         
     def set_odometry(self, x: float = 0.0, y: float = 0.0, theta: float = 0.0) -> None:
         self.send_msg("SET_ODOMETRY", "fff", x, y, theta)
-        
-        
     
     def get_motors_speed(self) -> None:
         self.send_msg("GET_MOTORS_SPEED", "")
@@ -223,14 +223,14 @@ class LidarClient:
         self.FRAME_SIZE = 20
         self.FRAME_FORMAT = "<HHHHHHHHHH" # 20B – угол начала, угол конца, 8×дистанция
         self.CRC_SIZE = 2
-        self.MAX_PKGS = 200 # max packages per rev
+        self.MAX_FRAMES = 100 # max packages per rev
 
-    def connect(self, password: str, timeout=1.0):
+    def connect(self, timeout=1.0):
         self.__client.settimeout(timeout)
         self.__client.setblocking(True)
         
         self.log(f"Connecting to server {self.host}:{self.port}")
-        self.__client.sendto("connect str", (self.host, self.port))
+        self.__client.sendto("connect str".encode('utf-8'), (self.host, self.port))
         self.log("Connected!")
             
         self.__client.setblocking(False)
@@ -268,12 +268,12 @@ class LidarClient:
     
     def receive_lidar(self):
         try:
-            bin_data = self.__client.recv(self.FRAME_SIZE)
-        except BlockingIOError:
+            bin_data = self.__client.recv(self.FRAME_SIZE * self.MAX_FRAMES)
+        except:
             return None
         
         # Check for wrong data
-        if not ( self.FRAME_SIZE + self.CRC_SIZE <= len(bin_data) <= self.MAX_PKGS * self.FRAME_SIZE + self.CRC_SIZE ):
+        if not ( self.FRAME_SIZE + self.CRC_SIZE <= len(bin_data) <= self.MAX_FRAMES * self.FRAME_SIZE + self.CRC_SIZE ):
             return None
         
         if crc16(bin_data[:-2]) != int.from_bytes(bin_data[-2:], "little"):

@@ -48,6 +48,7 @@ int __buffer_counter;
 
 WiFiServer socket_server(SERVER_PORT, 1);
 WiFiClient socket_client;
+bool socket_connected = 0;
 int data_size;
 
 
@@ -58,20 +59,28 @@ inline void SetupSocketServer() {
     LogInfo("Starting socket server on port %i", SERVER_PORT);
     socket_server.begin();
     LogInfo("Socket server started");
-
-    LogInfo("Waiting for socket client");
-    while ( !socket_server.hasClient() ) {
-        delay(10);
-    }
-
-    socket_client = socket_server.accept();
-    LogInfo("Socket client connected! IP: %s", socket_client.localIP().toString().c_str());
 }
 
 
 
 void HandleAPIServer() {
     LogTrace("Handle API server");
+
+    if ( !socket_client.connected() || !socket_connected ) {
+        if ( socket_connected ) {
+            socket_connected = 0;
+            WheelsSetSpeed(0.0, 0.0);
+            LogWarn("Socket client disconnected.");
+        }
+        
+        if ( socket_server.hasClient() ) {
+            socket_client = socket_server.accept();
+            socket_connected = 1;
+            LogInfo("New socket client connected! IP: %s", socket_client.localIP().toString().c_str());
+        }
+        
+        return;
+    }
     
     if ( data_size == 0 ) {
         if ( socket_client.available() < 2 ) {
