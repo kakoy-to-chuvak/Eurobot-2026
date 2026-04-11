@@ -20,12 +20,11 @@ static float prevStartAngle = -1;
 
 
 // UDP server
-#define UDP_PASSWORD "udp_password"
+
 WiFiUDP udp_server;
 IPAddress udp_client_ip;
 
 void StartUdpServer() {
-
     // Starting udp server
     LogInfo("Starting UDP server on port %i", UDP_SERVER_PORT);
     udp_server.begin(UDP_SERVER_PORT);

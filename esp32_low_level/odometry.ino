@@ -19,7 +19,7 @@ void SetOdometry(float _Xpos, float _Ypos, float _Theta) {
 
 
 void ComputeOdometry() {
-    LogTrace("Compute odometry");
+    LogTrace2("Compute odometry");
 
     int32_t current_l = stepper_l.getCurrent();
     int32_t current_r = stepper_r.getCurrent();

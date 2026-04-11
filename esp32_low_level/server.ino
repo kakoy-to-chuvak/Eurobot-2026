@@ -6,6 +6,7 @@
 
 
 
+// buffer for sending messages
 uint8_t __send_buffer[64];
 int __buffer_counter;
 
@@ -64,7 +65,7 @@ inline void SetupSocketServer() {
 
 
 void HandleAPIServer() {
-    LogTrace("Handle API server");
+    LogTrace2("Handle API server");
 
     if ( !socket_client.connected() || !socket_connected ) {
         if ( socket_connected ) {
@@ -173,7 +174,7 @@ void HandleData(uint8_t event, uint8_t *data) {
             SET_SEND_DATA(float, wheel_speed_linear);
             SET_SEND_DATA(float, wheel_speed_angular);
             // lift height
-            SET_SEND_DATA(float, LiftGetHeight());
+            SET_SEND_DATA(uint16_t, LiftGetHeight());
             // servo state
             SET_SEND_DATA(uint32_t, *(uint32_t*)ServoGetCurrentPos());
             // odometry

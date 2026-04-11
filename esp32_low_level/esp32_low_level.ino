@@ -7,8 +7,8 @@
 
 
 // Wifi
-#define SSID "robotx"
-#define PASSWORD "78914040"
+#define SSID "realme C61"
+#define PASSWORD "2022y2022y"
 
 #define CREATE_ACCESS 0
 #define MY_SSID "my_robotx"
@@ -93,7 +93,7 @@ void loop() {
         tps = tps_counter;
         tps_counter = 0;
         tps_timer = millis();
-        LogDebug("TPS: %lu", tps);
+        LogTrace("TPS: %lu", tps);
     }
 }
 

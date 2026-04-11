@@ -46,7 +46,7 @@ constexpr uint16_t SERVO_DELAY = 1000 / SERVO_SPEED; // delay between calls
 
 
 // ==== Debug ====
-#define LOGGING -1
+#define LOGGING -2
 
 #if LOGGING <= 2
 #   define LodError(fmt, ...) Serial.printf("[ERROR] " fmt "\n", ##__VA_ARGS__)
@@ -76,6 +76,12 @@ constexpr uint16_t SERVO_DELAY = 1000 / SERVO_SPEED; // delay between calls
 #   define LogTrace(fmt, ...) Serial.printf("[TRACE] " fmt "\n", ##__VA_ARGS__)
 #else
 #   define LogTrace(fmt, ...) 
+#endif
+
+#if LOGGING <= -3
+#   define LogTrace2(fmt, ...) Serial.printf("[TRACE] " fmt "\n", ##__VA_ARGS__)
+#else
+#   define LogTrace2(fmt, ...) 
 #endif
 
 
