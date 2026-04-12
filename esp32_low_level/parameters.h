@@ -8,7 +8,7 @@
 
 // Server
 #define SERVER_PORT 8080
-#define UDP_SERVER_PORT 8090
+#define LIDAR_PORT 8090
 
 
 
@@ -78,5 +78,10 @@ constexpr uint16_t SERVO_DELAY = 1000 / SERVO_SPEED; // delay between calls
 #   define LogTrace(fmt, ...) 
 #endif
 
+#if LOGGING <= -3
+#   define LogTrace2(fmt, ...) Serial.printf("[TRACE] " fmt "\n", ##__VA_ARGS__)
+#else
+#   define LogTrace2(fmt, ...) 
+#endif
 
 #endif

@@ -4,7 +4,7 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /LaserScan1
+        - /Grid1
       Splitter Ratio: 0.6839237213134766
     Tree Height: 742
   - Class: rviz_common/Selection
@@ -115,7 +115,7 @@ Visualization Manager:
       Position Transformer: XYZ
       Selectable: true
       Size (Pixels): 6
-      Size (m): 0.019999999552965164
+      Size (m): 0.009999999776482582
       Style: Flat Squares
       Topic:
         Depth: 5
@@ -212,25 +212,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 7.114002227783203
+      Distance: 6.3618035316467285
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.16857783496379852
-        Y: -0.9680092930793762
-        Z: -0.16821296513080597
+        X: 0.029537523165345192
+        Y: 0.10771425068378448
+        Z: 0.22116845846176147
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.054796814918518
+      Pitch: 1.1647968292236328
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.8066694736480713
+      Yaw: 3.2341113090515137
     Saved: ~
 Window Geometry:
   Displays:

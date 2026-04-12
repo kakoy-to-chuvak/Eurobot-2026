@@ -49,7 +49,7 @@ inline void LiftTick() {
     lift_l.tick();
     lift_r.tick();
 
-    if ( lift_l.getCurrent() < int(2.0 * LIFT_L_STEPS_PER_MM) ) {
+    if ( lift_l.getCurrent() < int(2.0 * LIFT_L_STEPS_PER_MM) && lift_target_height < 2 ) {
         // Disable motors
         digitalWrite(LIFT_L_ENA, 1);
     } else {
@@ -57,7 +57,7 @@ inline void LiftTick() {
         digitalWrite(LIFT_L_ENA, 0);
     }
 
-    if ( lift_r.getCurrent() < int(2.0 * LIFT_R_STEPS_PER_MM) ) {
+    if ( lift_r.getCurrent() < int(2.0 * LIFT_R_STEPS_PER_MM) && lift_target_height < 2 ) {
         // Disable motors
         digitalWrite(LIFT_R_ENA, 1);
     } else {

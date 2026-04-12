@@ -6,6 +6,7 @@
 
 
 
+// buffer for sending messages
 uint8_t __send_buffer[64];
 int __buffer_counter;
 
@@ -48,7 +49,7 @@ int __buffer_counter;
 
 WiFiServer socket_server(SERVER_PORT, 1);
 WiFiClient socket_client;
-bool socket_connected = 0;
+bool socket_connected = 1;
 int data_size;
 
 
@@ -58,13 +59,13 @@ int data_size;
 inline void SetupSocketServer() {
     LogInfo("Starting socket server on port %i", SERVER_PORT);
     socket_server.begin();
-    LogInfo("Socket server started");
+    LogInfo("Socket server started!");
 }
 
 
 
 void HandleAPIServer() {
-    LogTrace("Handle API server");
+    LogTrace2("Handle API server");
 
     if ( !socket_client.connected() || !socket_connected ) {
         if ( socket_connected ) {
@@ -73,10 +74,11 @@ void HandleAPIServer() {
             LogWarn("Socket client disconnected.");
         }
         
+        Serial.println("Aasssd");
         if ( socket_server.hasClient() ) {
             socket_client = socket_server.accept();
             socket_connected = 1;
-            LogInfo("New socket client connected! IP: %s", socket_client.localIP().toString().c_str());
+            LogInfo("New socket client connected! IP: %s", socket_client.remoteIP().toString().c_str());
         }
         
         return;
@@ -173,7 +175,7 @@ void HandleData(uint8_t event, uint8_t *data) {
             SET_SEND_DATA(float, wheel_speed_linear);
             SET_SEND_DATA(float, wheel_speed_angular);
             // lift height
-            SET_SEND_DATA(float, LiftGetHeight());
+            SET_SEND_DATA(uint16_t, LiftGetHeight());
             // servo state
             SET_SEND_DATA(uint32_t, *(uint32_t*)ServoGetCurrentPos());
             // odometry

@@ -1,4 +1,5 @@
-#include <WiFiUdp.h>
+#include <WiFiClient.h>
+#include <WiFiServer.h>
 
 #include "pinout.h"
 #include "parameters.h"
@@ -19,26 +20,26 @@ static uint8_t frameCount = 0;
 static float prevStartAngle = -1;
 
 
-// UDP server
-#define UDP_PASSWORD "udp_password"
-WiFiUDP udp_server;
-IPAddress udp_client_ip;
+// UDP serverw
+WiFiServer lidar_server(LIDAR_PORT, 1);
+WiFiClient lidar_client;
 
-void StartUdpServer() {
 
+void StartLidarServer() {
     // Starting udp server
-    LogInfo("Starting UDP server on port %i", UDP_SERVER_PORT);
-    udp_server.begin(UDP_SERVER_PORT);
-    LogInfo("UDP server started");
+    LogInfo("Starting lidar server on port %i", LIDAR_PORT);
+    lidar_server.begin();
+    LogInfo("Lidar server started");
+}
 
-    // Waiting for udp client
-    LogInfo("Waiting for udp client");
-    while ( !udp_server.parsePacket() ) {
-        vTaskDelay(10);
+void ProcessLidarServer() {
+    if ( !lidar_client.connected() ) {
+        if ( lidar_server.hasClient() ) {
+            lidar_client = lidar_server.accept();
+            LogInfo("New socket client connected! IP: %s", lidar_client.localIP().toString().c_str());
+        }   
+        return;
     }
-
-    udp_client_ip = udp_server.remoteIP();
-    LogInfo("UDP client connected! IP: %s", udp_client_ip.toString().c_str());
 }
 
 // ==== Helper lidar functions ====
@@ -92,16 +93,13 @@ void LidarTask(void *_Param) {
     Serial2.begin(LIDAR_BAUD, SERIAL_8N1, LIDAR_RX_PIN, LIDAR_TX_PIN);
     uint8_t body[BODY_LEN];
 
-    StartUdpServer();
+    StartLidarServer();
 
     
     while (true) {
         vTaskDelay(1);
 
-        if ( udp_server.parsePacket() ) {
-            udp_client_ip = udp_server.remoteIP();
-            LogInfo("New UDP client connected! IP: %s", udp_client_ip.toString().c_str());
-        }
+        ProcessLidarServer();
 
         if ( !waitLidarHeader(Serial2) || !readBytes(Serial2, body, BODY_LEN) ) {
             continue;
@@ -158,7 +156,11 @@ void LidarTask(void *_Param) {
             scanBuf[scanSize + 1] = crc >> 8;
             
             // Отправляем по Socket
-            udp_server.write(scanBuf, scanSize + 2);
+            if ( lidar_client.connected() ) {
+                uint16_t length = scanSize + 2;
+                lidar_client.write((uint8_t*)&length, 2);
+                lidar_client.write(scanBuf, length);
+            }
 
             // Сбрасываем буфер для следующего оборота
             wr = scanBuf;

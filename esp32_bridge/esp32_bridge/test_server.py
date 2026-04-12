@@ -194,7 +194,7 @@ class SocketClient:
 # -------------------------- Server --------------------------
 HOST = "127.0.0.1"
 PORT = 8080
-LIDAR_PORT = 8090
+LIDAR_PORT = 8091
 
 esp_client = None
 
@@ -210,11 +210,12 @@ socket_server.setblocking(False)
 print(get_time(), "Socket server created!")
 
 
-udp_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-udp_server.bind((HOST, PORT))
-udp_server.setblocking(False)
-udp_client_ip = None
-print(get_time(), "UDP server created!")
+lidar_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+lidar_server.bind((HOST, LIDAR_PORT))
+lidar_server.listen()
+lidar_server.setblocking(False)
+lidar_client = None
+print(get_time(), "Lidar server created!")
 
 # -------------------------- Robot simulation --------------------------
 def get_angle(point: tuple) -> float:
@@ -364,10 +365,14 @@ def PublishLidar():
     if time.perf_counter() - lidar_timer < lidar_delay:
         return
     
-    if udp_client_ip:
+    if lidar_client is not None:
+        lidar_server.setblocking(True)
         lidar_pkg = create_lidar_pkg(400)
         lidar_pkg += struct.pack("<H", crc16(lidar_pkg))
-        udp_server.sendto(lidar_pkg, udp_client_ip)
+        lidar_pkg = struct.pack("<H", len(lidar_pkg)) + lidar_pkg
+        lidar_client.sendall(lidar_pkg)
+        lidar_server.setblocking(False)
+        
 
     lidar_timer = time.perf_counter()
 
@@ -376,7 +381,7 @@ def PublishLidar():
 
 # -------------------------- main cycle --------------------------
 def main():
-    global udp_server, socket_server, run, esp_client, udp_client_ip
+    global udp_server, socket_server, run, esp_client, udp_client_ip, lidar_client
     while run:
 
         # Simulate moving
@@ -401,13 +406,10 @@ def main():
                 print(get_time(), "New client!")
             except BlockingIOError:
                 pass
-
-
+        
         try:
-            msg, addr = udp_server.recvfrom(32)
-            udp_client_ip = addr
-            print(get_time(), "New udp client:", addr)
-
+            lidar_client, addr = lidar_server.accept()
+            print(get_time(), "New lidar client!" + str(lidar_client))
         except:
             pass
 

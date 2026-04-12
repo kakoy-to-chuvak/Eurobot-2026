@@ -61,12 +61,12 @@ class Esp32_Bridge(Node):
         self.declare_parameter("port", 8080)
         self.port = self.get_parameter("port").value
 
-        self.declare_parameter("lidar_port", 8080)
+        self.declare_parameter("lidar_port", 8090)
         self.lidar_port = self.get_parameter("lidar_port").value
         
         # Connecting to server
         self.esp_client = EspClientApi.EspClient(self.host, self.port, self.get_logger().info)
-        self.esp_client.connect(self.esp_client.password)
+        self.esp_client.connect()
 
         self.lidar_client = EspClientApi.LidarClient(self.host, self.lidar_port, self.get_logger().info)
         self.lidar_client.connect()
@@ -357,10 +357,8 @@ class Esp32_Bridge(Node):
             msg = self.esp_client.receive_msg()
 
         msg = self.lidar_client.receive_lidar()
-        if msg == None:
-            return
-        
-        self.publish_lidar(msg['angles'], msg['ranges'], msg['intens'])
+        if msg is not None:
+            self.publish_lidar(msg['angles'], msg['ranges'], msg['intens'])
                 
 
 def main(args=None):

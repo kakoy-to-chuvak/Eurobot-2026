@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'esp32_bridge'
+package_name = 'path_follower'
 
 setup(
     name=package_name,
@@ -13,7 +13,7 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='kakoy-to-chuvak',
+    maintainer='Daniil',
     maintainer_email='kakoy-to-chuvak@yandex.ru',
     description='TODO: Package description',
     license='TODO: License declaration',
@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "esp32_bridge = esp32_bridge.esp32_bridge:main",
+            "path_follower = path_follower.path_follower:main"
         ],
     },
 )

@@ -45,7 +45,7 @@ class EspClient():
         
         self.data_size = 0
        
-    def connect(self, password: str, timeout=1.0):
+    def connect(self, timeout=1.0):
         self.__client.settimeout(timeout)
         self.__client.setblocking(True)
         
@@ -169,7 +169,7 @@ class EspClient():
         self.send_msg("SET_MOTORS_SPEED", "ff", linear_x, angular_z)
         
     def set_lift_height(self, height: int) -> None:
-        self.send_msg("SET_LIFT_HEIGHT", "H", constrain(height, 0, 10101))
+        self.send_msg("SET_LIFT_HEIGHT", "H", constrain(height, 0, 1000))
         
     def set_servo_state(self, angles) -> None:
         self.send_msg("SET_SERVO_STATE", "BBBB", constrain(angles[0], 0, 255), constrain(angles[1], 0, 255), constrain(angles[2], 0, 255), constrain(angles[3], 0, 255))
@@ -215,7 +215,8 @@ class LidarClient:
         self.port = port
         self.log = log_function
 
-        self.__client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.__client = socket.socket(socket.AF_INET, socket.SOCK_STREAM    )
+        self.data_size = 0
         self.sended_msgs = 0
         self.received_msgs = 0
 
@@ -223,17 +224,20 @@ class LidarClient:
         self.FRAME_SIZE = 20
         self.FRAME_FORMAT = "<HHHHHHHHHH" # 20B – угол начала, угол конца, 8×дистанция
         self.CRC_SIZE = 2
-        self.MAX_FRAMES = 100 # max packages per rev
+        self.MAX_PKGS = 200 # max packages per rev
 
     def connect(self, timeout=1.0):
         self.__client.settimeout(timeout)
         self.__client.setblocking(True)
         
         self.log(f"Connecting to server {self.host}:{self.port}")
-        self.__client.sendto("connect str".encode('utf-8'), (self.host, self.port))
+        self.__client.connect((self.host, self.port))
         self.log("Connected!")
             
         self.__client.setblocking(False)
+        
+    def disconnect(self) -> None:
+        self.__client.close()
 
     def convert_lidar(self, raw: bytes):
         package_len = len(raw) // self.FRAME_SIZE
@@ -267,13 +271,24 @@ class LidarClient:
         return (angles, ranges, intens)
     
     def receive_lidar(self):
-        try:
-            bin_data = self.__client.recv(self.FRAME_SIZE * self.MAX_FRAMES)
-        except:
+        if self.data_size == 0:
+            if self.available() < 2:
+                return None
+            self.data_size = struct.unpack("<H", self.__client.recv(2))[0]
+            if self.data_size > 3000:
+                self.log(f"Too big data size: {self.data_size}")
+                self.data_size = 0
+                return None
+            
+        if self.available() < self.data_size:
             return None
+            
+        bin_data = self.__client.recv(self.data_size)
+        self.received_msgs += 1
+        self.data_size = 0
         
         # Check for wrong data
-        if not ( self.FRAME_SIZE + self.CRC_SIZE <= len(bin_data) <= self.MAX_FRAMES * self.FRAME_SIZE + self.CRC_SIZE ):
+        if not ( self.FRAME_SIZE + self.CRC_SIZE <= len(bin_data) <= self.MAX_PKGS * self.FRAME_SIZE + self.CRC_SIZE ):
             return None
         
         if crc16(bin_data[:-2]) != int.from_bytes(bin_data[-2:], "little"):
@@ -289,3 +304,10 @@ class LidarClient:
             "ranges": lidar_data[1],
             "intens": lidar_data[2],
         }
+        
+        
+    def available(self) -> int:
+        try:
+            return len(self.__client.recv(4000, socket.MSG_PEEK))
+        except:
+            return 0
