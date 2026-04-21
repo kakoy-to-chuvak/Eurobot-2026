@@ -14,13 +14,13 @@
 
 // Robot
 #define WHEEL_R 0.0455     // m
-#define WHEEL_BASE 0.2075  // m
+#define WHEEL_BASE 0.21  // m
 #define WHEEL_STEPS_PER_REV 800
 constexpr float WHEEL_STEPS_PER_M = (float)WHEEL_STEPS_PER_REV / ( 2.0f * M_PI * WHEEL_R );
 
 // Lift
 #define LIFT_MIN_POSITION 0    // mm
-#define LIFT_MAX_POSITION 200  // mm
+#define LIFT_MAX_POSITION 190  // mm
 
 #define LIFT_STEPS_PER_REV 800
 #define LIFT_R_MM_PER_REV 16.05 
@@ -31,12 +31,10 @@ constexpr uint16_t LIFT_R_STEPS_PER_MM = LIFT_STEPS_PER_REV / LIFT_R_MM_PER_REV 
 
 
 // Speed and delays
-#define SERVO_SPEED 200  // degree per second
-constexpr uint16_t SERVO_DELAY = 1000 / SERVO_SPEED; // delay between calls
+const unsigned long DELAY_PER_SERVO[4] = { 20, 20, 20, 20 };
 
 #define SERVER_DELAY   5 // delay between calls
-#define ODOMETRY_DELAY 5 // delay between calls
-
+#define ODOMETRY_DELAY 50 // delay between calls
 
 
 
@@ -46,39 +44,39 @@ constexpr uint16_t SERVO_DELAY = 1000 / SERVO_SPEED; // delay between calls
 
 
 // ==== Debug ====
-#define LOGGING -1
+#define LOG_LEVEL 0
 
-#if LOGGING <= 2
+#if LOG_LEVEL <= 2
 #   define LodError(fmt, ...) Serial.printf("[ERROR] " fmt "\n", ##__VA_ARGS__)
 #else
 #   define LodError(fmt, ...) 
 #endif
 
-#if LOGGING <= 1
+#if LOG_LEVEL <= 1
 #   define LogWarn(fmt, ...) Serial.printf("[WARN] " fmt "\n", ##__VA_ARGS__)
 #else
 #   define LogWarn(fmt, ...) 
 #endif
 
-#if LOGGING <= 0
+#if LOG_LEVEL <= 0
 #   define LogInfo(fmt, ...) Serial.printf("[INFO] " fmt "\n", ##__VA_ARGS__)
 #else
 #   define LogInfo(fmt, ...) 
 #endif
 
-#if LOGGING <= -1
+#if LOG_LEVEL <= -1
 #   define LogDebug(fmt, ...) Serial.printf("[DEBUG] " fmt "\n", ##__VA_ARGS__)
 #else
 #   define LogDebug(fmt, ...) 
 #endif
 
-#if LOGGING <= -2
+#if LOG_LEVEL <= -2
 #   define LogTrace(fmt, ...) Serial.printf("[TRACE] " fmt "\n", ##__VA_ARGS__)
 #else
 #   define LogTrace(fmt, ...) 
 #endif
 
-#if LOGGING <= -3
+#if LOG_LEVEL <= -3
 #   define LogTrace2(fmt, ...) Serial.printf("[TRACE] " fmt "\n", ##__VA_ARGS__)
 #else
 #   define LogTrace2(fmt, ...) 

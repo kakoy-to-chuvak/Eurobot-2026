@@ -20,7 +20,8 @@ int __buffer_counter;
 #define SEND_MSG() do{  *(uint16_t*)__send_buffer = __buffer_counter - 2;    \
                         socket_client.write(__send_buffer, __buffer_counter);  \
                         __buffer_counter = 0;   \
-                        LogTrace("Send message");   }while(0)
+                        LogTrace("Send message"); \
+                        sended_messages++;  }while(0)
 
 
 // Server events
@@ -47,10 +48,13 @@ int __buffer_counter;
 
 
 
-WiFiServer socket_server(SERVER_PORT, 1);
+WiFiServer socket_server(SERVER_PORT);
 WiFiClient socket_client;
-bool socket_connected = 1;
+bool socket_connected = 0;
 int data_size;
+
+uint32_t sended_messages = 0;
+uint32_t received_messages = 0;
 
 
 
@@ -74,7 +78,6 @@ void HandleAPIServer() {
             LogWarn("Socket client disconnected.");
         }
         
-        Serial.println("Aasssd");
         if ( socket_server.hasClient() ) {
             socket_client = socket_server.accept();
             socket_connected = 1;
@@ -102,6 +105,7 @@ void HandleAPIServer() {
 
     socket_client.read(buffer, data_size);
     LogTrace("Read data");
+    received_messages++;
     
     data_size--;
     HandleData(buffer[0], buffer+1);

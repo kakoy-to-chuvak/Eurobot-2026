@@ -14,13 +14,12 @@ else:
 
 msg = """
 -----------------------------------------------------
-Moving around:   |  Rotating Servo:    |  Moving lift
-   u    i    o   |  1   2   3   4   5  |  -   =
-   j    k    l   |  q   w   e   r   t  | 
-   m    ,    .   |                     |
+Moving around:   |  Rotating Servo:  |  Moving lift
+   u    i    o   |    1   2   3   4  |  -   =
+   j    k    l   |    q   w   e   r  |
+   m    ,    .   |                   |
 
 anything else : stop
-SHIFT to increace speed
 
 q/z : increase/decrease max speeds by 10%
 w/x : increase/decrease only linear linear by 10%
@@ -39,15 +38,6 @@ moveBindings = {
 		',': ( -1,  0 ),
 		'.': ( -1,  1 ),
 		'm': ( -1, -1 ),
-
-        'I': (  2,  0 ),
-		'O': (  2, -2 ),
-		'J': (  0,  2 ),
-		'L': (  0, -2 ),
-		'U': (  2,  2 ),
-		'<': ( -2,  0 ),
-		'>': ( -2,  2 ),
-		'M': ( -2, -2 ),
 }
 
 lift_binds = {

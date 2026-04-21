@@ -155,9 +155,9 @@ class EspClient():
                     "servo_state": data[3:7],
                     
                     "odometry": {
-                        "x"     : data[7],
-                        "y"     : data[8],
-                        "theta" : data[9],
+                        "theta" : data[7],
+                        "x"     : data[8],
+                        "y"     : data[9],
                     }
                 }
                 
@@ -210,12 +210,12 @@ def crc16(buf: bytes, crc: int = 0xFFFF) -> int:
 
 
 class LidarClient:
-    def __init__(self, host, port, log_function = print):
+    def __init__(self, host: str, port: int, log_function = print):
         self.host = host
         self.port = port
         self.log = log_function
 
-        self.__client = socket.socket(socket.AF_INET, socket.SOCK_STREAM    )
+        self.__client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.data_size = 0
         self.sended_msgs = 0
         self.received_msgs = 0
@@ -282,21 +282,24 @@ class LidarClient:
             
         if self.available() < self.data_size:
             return None
-            
+
         bin_data = self.__client.recv(self.data_size)
         self.received_msgs += 1
         self.data_size = 0
         
         # Check for wrong data
         if not ( self.FRAME_SIZE + self.CRC_SIZE <= len(bin_data) <= self.MAX_PKGS * self.FRAME_SIZE + self.CRC_SIZE ):
+            self.log("Wrong data size")
             return None
         
         if crc16(bin_data[:-2]) != int.from_bytes(bin_data[-2:], "little"):
+            self.log("Wrong crc")
             return None
                 
         lidar_data = self.convert_lidar(bin_data[:-2])
 
         if lidar_data == None:
+            self.log("Failed convertion")
             return None
                 
         return {

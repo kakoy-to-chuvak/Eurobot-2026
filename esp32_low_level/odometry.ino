@@ -14,7 +14,7 @@ void SetOdometry(float _Xpos, float _Ypos, float _Theta) {
     xPos = _Xpos;
     yPos = _Ypos;
     theta = _Theta;
-}
+}   
 
 
 
@@ -30,9 +30,11 @@ void ComputeOdometry() {
     float delta_s = ( delta_l + delta_r ) / 2.0;
     float delta_theta = ( delta_r - delta_l ) / WHEEL_BASE;
 
+    xPos += delta_s * cos(theta + delta_theta / 2.0);
+    yPos += delta_s * sin(theta + delta_theta / 2.0);
     theta += delta_theta;
-    xPos += delta_s * cos(theta);
-    yPos += delta_s * sin(theta);
+
+    // LogInfo("%f %f %f %f %f %f %f", delta_l, delta_r, delta_s, delta_theta, theta, xPos, yPos);
 
     prev_current_l = current_l;
     prev_current_r = current_r;

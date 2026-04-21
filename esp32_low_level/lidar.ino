@@ -20,8 +20,8 @@ static uint8_t frameCount = 0;
 static float prevStartAngle = -1;
 
 
-// UDP serverw
-WiFiServer lidar_server(LIDAR_PORT, 1);
+// // UDP serverw
+WiFiServer lidar_server(LIDAR_PORT);
 WiFiClient lidar_client;
 
 
@@ -33,11 +33,12 @@ void StartLidarServer() {
 }
 
 void ProcessLidarServer() {
-    if ( !lidar_client.connected() ) {
+    if ( !lidar_client || !lidar_client.connected() ) {
         if ( lidar_server.hasClient() ) {
             lidar_client = lidar_server.accept();
-            LogInfo("New socket client connected! IP: %s", lidar_client.localIP().toString().c_str());
-        }   
+            LogInfo("New lidar client connected! IP: %s", lidar_client.remoteIP().toString().c_str());
+        }
+
         return;
     }
 }
@@ -90,7 +91,7 @@ inline uint16_t crc16(uint16_t _Crc, uint8_t _V) {
 
 // ==== Main lidar task ====
 void LidarTask(void *_Param) {
-    Serial2.begin(LIDAR_BAUD, SERIAL_8N1, LIDAR_RX_PIN, LIDAR_TX_PIN);
+    Serial2.begin(LIDAR_BAUD, SERIAL_8N1, LIDAR_RX_PIN, -1);
     uint8_t body[BODY_LEN];
 
     StartLidarServer();
@@ -157,6 +158,7 @@ void LidarTask(void *_Param) {
             
             // Отправляем по Socket
             if ( lidar_client.connected() ) {
+                LogTrace("Sending lidar");
                 uint16_t length = scanSize + 2;
                 lidar_client.write((uint8_t*)&length, 2);
                 lidar_client.write(scanBuf, length);

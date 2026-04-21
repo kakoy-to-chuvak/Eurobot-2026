@@ -20,19 +20,37 @@ inline void SetupLift() {
     pinMode(LIFT_L_ENA, OUTPUT);
     pinMode(LIFT_R_ENA, OUTPUT);
 
-    lift_l.setMaxSpeed(8000);
-    lift_r.setMaxSpeed(8000);
+    lift_l.setMaxSpeed(5000);
+    lift_r.setMaxSpeed(5000);
 
     lift_l.reverse(1);
     lift_r.reverse(1);
 
+    // Disable motors
+    digitalWrite(LIFT_L_ENA, 1);
+    digitalWrite(LIFT_R_ENA, 1);
+}
+
+inline void CalibrateLift() {
     // Enable motors
     digitalWrite(LIFT_L_ENA, 0);
     digitalWrite(LIFT_R_ENA, 0);
+
+    lift_l.setTarget(-LIFT_MAX_POSITION * LIFT_L_STEPS_PER_MM, ABSOLUTE);
+    lift_r.setTarget(-LIFT_MAX_POSITION * LIFT_R_STEPS_PER_MM, ABSOLUTE);
+
+    while ( lift_l.tick() | lift_r.tick() );
+
+    lift_l.setCurrent(0);
+    lift_r.setCurrent(0);
+
+    // Disable motors
+    digitalWrite(LIFT_L_ENA, 1);
+    digitalWrite(LIFT_R_ENA, 1);
 }
 
 inline void LiftSetTarget(uint16_t _Height_mm) {
-    LogTrace("Set lift target");
+    LogTrace("Set lift target: %i", _Height_mm);
     // Ограничиваем позицию пределами рабочей зоны
     lift_target_height = constrain(_Height_mm, LIFT_MIN_POSITION, LIFT_MAX_POSITION);
     

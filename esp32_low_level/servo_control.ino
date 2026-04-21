@@ -5,51 +5,65 @@
 
 
 
-
 Servo servos[4];
+
 const uint8_t servosLimits[4][2] = {
     { 95,  5   },
     { 104, 14  },
-    { 79,  169 },
-    { 78,  168 },
+    { 75,  165 },
+    { 75,  165 },
 };
+// uint32_t servoLastUpdate[4] = { 0 };
 
-uint8_t servosTargetPos[4]  = { servosLimits[0][1], servosLimits[1][1], servosLimits[2][1], servosLimits[3][1] };
+
+// uint8_t servosTargetPos[4]  = { servosLimits[0][1], servosLimits[1][1], servosLimits[2][1], servosLimits[3][1] };
 uint8_t servosCurrentPos[4] = { servosLimits[0][1], servosLimits[1][1], servosLimits[2][1], servosLimits[3][1] };
 
 
 inline void SetupServo() {
-    LogDebug("Setup servo");
+    LogDebug("Setup servo");    
 
     for (int i = 0; i < 4; i++) {
-        servos[i].attach(SERVO_PINS[i]);
-        servos[i].setPeriodHertz(50);
-        servos[i].write(servosCurrentPos[i]);
+        ESP32PWM::allocateTimer(0);
+        ESP32PWM::allocateTimer(1);
+        ESP32PWM::allocateTimer(3);
+        ESP32PWM::allocateTimer(4);
+        servos[i].attach(SERVO_PINS[i], 500, 2500);
+        servos[i].write(servosLimits[i][1]);
     }
 }
 
 
-inline void ServoPosControl() {
-    for ( uint8_t i = 0 ; i < 4; i++ ) {
-        if ( servosCurrentPos[i] < servosTargetPos[i] ) {
-            servosCurrentPos[i]++;    
-            servos[i].write(servosCurrentPos[i]);
-        } else if ( servosCurrentPos[i] > servosTargetPos[i] ) {
-            servosCurrentPos[i]--;
-            servos[i].write(servosCurrentPos[i]);
-        }
-    }
-}
+// inline void ServoPosControl() {
+//     LogTrace2("Servo pos control");
+//     unsigned long currentMillis = millis();
+    
+//     for (uint8_t i = 0; i < 4; i++) {
+//         if (currentMillis - servoLastUpdate[i] < DELAY_PER_SERVO[i]) {
+//             continue;
+//         }
+        
+//         if ( servosCurrentPos[i] < servosTargetPos[i] ) {
+//             servosCurrentPos[i]++;
+//             servos[i].write(servosCurrentPos[i]);
+//         } else if ( servosCurrentPos[i] > servosTargetPos[i] ) {
+//             servosCurrentPos[i]--;
+//             servos[i].write(servosCurrentPos[i]);
+//         }
+
+//         servoLastUpdate[i] = currentMillis;
+//     }
+// }
 
 
 inline void ServoSetTarget(uint8_t *_Buffer) {
-    LogTrace("Set sevo target");
+    LogTrace("Set sevo target: %i %i %i %i", _Buffer[0], _Buffer[1], _Buffer[2], _Buffer[3]);
     
     for ( int i = 0 ; i < 4 ; i++ ) {
         // constrain value
         uint8_t value = constrain(_Buffer[i], 0, 90);
-
-        servosTargetPos[i] = map(value, 0, 90, servosLimits[i][0], servosLimits[i][1]);
+        servosCurrentPos[i] = map(value, 0, 90, servosLimits[i][0], servosLimits[i][1]);
+        servos[i].write(servosCurrentPos[i]);
     }
 };
 

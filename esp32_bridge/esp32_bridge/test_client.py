@@ -4,13 +4,13 @@ import threading
 import pprint
 
 
-HOST = "192.168.0.126"
+HOST = "192.168.0.123"
 PORT = 8080
 run = True
 
 client = EspClientApi.EspClient(HOST, PORT)
 
-client.connect(client.password, None)
+client.connect(None)
 
 
 def handle_input():

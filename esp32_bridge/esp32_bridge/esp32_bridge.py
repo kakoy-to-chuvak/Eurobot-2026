@@ -131,7 +131,7 @@ class Esp32_Bridge(Node):
             exit(-1)
         
         # Lidar params
-        self.declare_parameter("lidar_shift_deg", 0.0) # сдвиг облака CW
+        self.declare_parameter("lidar_shift_deg", -15.0) # сдвиг облака CW
         self.declare_parameter("lidar_mirror", True)     # зеркально (True/False)
         self.declare_parameter("lidar_range_min", 0.05)
         self.declare_parameter("lidar_range_max", 4.0)

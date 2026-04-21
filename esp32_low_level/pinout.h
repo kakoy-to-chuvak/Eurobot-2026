@@ -30,7 +30,6 @@ const int SERVO_PINS[4] = { SERVO_0, SERVO_1, SERVO_2, SERVO_3 };
 
 // Lidar
 #define LIDAR_RX_PIN 16    // lidar TX -> ESP RX
-#define LIDAR_TX_PIN 17    // lidar RX (не обязательно использовать)   
 
 // Other
 #define STARTER 0

@@ -7,12 +7,12 @@
 
 
 // Wifi
-#define SSID "iPhone (Данил)"
-#define PASSWORD "Daniil321"
+#define SSID "robotx"
+#define PASSWORD "78914040"
 
 #define CREATE_ACCESS 0
 #define MY_SSID "my_robotx"
-#define MY_PASSWORD "my_78914040"
+#define MY_PASSWORD "78914040"
 
 
 uint32_t server_timer = 0;
@@ -28,8 +28,9 @@ void setup() {
     Serial.begin(115200);
 
     SetupWheels();
-    SetupLift();
     SetupServo();
+    SetupLift();
+    // CalibrateLift();
 
 #if CREATE_ACCESS
     // Creating access point
@@ -50,7 +51,8 @@ void setup() {
         delay(300);
         Serial.print('.');
     }
-
+    Serial.print("\n");
+    
     LogInfo("Wifi connected!");
     LogInfo("IP: %s", WiFi.localIP().toString().c_str());
 #endif
@@ -76,11 +78,7 @@ void loop() {
 
     WheelsTick();
     LiftTick();
-
-    if ( current_time - servo_timer > SERVO_DELAY ) {
-        ServoPosControl();
-        servo_timer = current_time;
-    }
+    // ServoPosControl();
 
     if ( current_time - odometry_timer > ODOMETRY_DELAY ) {
         ComputeOdometry();
@@ -93,7 +91,7 @@ void loop() {
         tps = tps_counter;
         tps_counter = 0;
         tps_timer = millis();
-        LogTrace("TPS: %lu", tps);
+        LogDebug("TPS: %lu", tps);
     }
 }
 
