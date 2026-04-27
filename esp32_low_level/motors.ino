@@ -39,7 +39,6 @@ void SetupWheels() {
 
 
 void WheelsSetSpeed(float _Linear, float _Angular) {
-    LogTrace("Wheels set speed");
 
     wheel_speed_linear = _Linear;
     wheel_speed_angular = _Angular;
@@ -49,6 +48,8 @@ void WheelsSetSpeed(float _Linear, float _Angular) {
 
     wheel_l_speed = linear_k - angular_k;
     wheel_r_speed = linear_k + angular_k;
+
+    LogTrace("Wheels set speed | linear: %f | angular: %f | wheel_left: %i | wheel_right: %i", _Linear, _Angular, wheel_l_speed, wheel_r_speed);
 
     stepper_l.setSpeed(wheel_l_speed);
     stepper_r.setSpeed(wheel_r_speed);

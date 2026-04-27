@@ -15,16 +15,22 @@
 #define MY_PASSWORD "78914040"
 
 
+// delays
 uint32_t server_timer = 0;
 uint32_t odometry_timer = 0;    
 uint32_t servo_timer = 0;   // timer for smooth moving
 
+// statistics
 uint32_t tps = 0; // ticks per second
 uint32_t tps_counter = 0; // ticks per second
 uint32_t tps_timer = 0;
+uint32_t min_loop_time = 0;
+uint32_t max_loop_time = 0;
 
 
 void setup() {
+    uint32_t setup_start_time = millis();
+
     Serial.begin(115200);
 
     SetupWheels();
@@ -65,6 +71,7 @@ void setup() {
     xTaskCreatePinnedToCore(LidarTask, "LidarTask", 8192, nullptr, 2, nullptr, 0);
     
     tps_timer = millis();
+    LogDebug("Setup ended is %llu ms", millis() - setup_start_time);
 }
 
 
@@ -78,7 +85,6 @@ void loop() {
 
     WheelsTick();
     LiftTick();
-    // ServoPosControl();
 
     if ( current_time - odometry_timer > ODOMETRY_DELAY ) {
         ComputeOdometry();
@@ -86,12 +92,21 @@ void loop() {
     }
 
     tps_counter++;
+    uint32_t loop_time = millis() - current_time;
+    if ( loop_time < min_loop_time ) {
+        min_loop_time = loop_time
+    }
+    if ( loop_time > max_loop_time ) {
+        max_loop_time = loop_time;
+    }
 
     if ( current_time - tps_timer >= 1000 ) {
         tps = tps_counter;
         tps_counter = 0;
+
+        LogDebug("Statistics: | TPS: %lu | min loop time: %llu | max loop time: %llu |", tps, min_loop_time, max_loop_time);
+
         tps_timer = millis();
-        LogDebug("TPS: %lu", tps);
     }
 }
 
