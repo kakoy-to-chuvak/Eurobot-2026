@@ -30,6 +30,9 @@ class EspClient():
         "SET_LIFT_HEIGHT"            : 72,
         "SET_SERVO_STATE"            : 73,
         "SET_ODOMETRY"               : 74,
+        
+        "SEND_START"                 : 112,
+        "SEND_SIDE"                  : 111,
     }
 
     password = "374tfb39784"
@@ -159,6 +162,20 @@ class EspClient():
                         "x"     : data[8],
                         "y"     : data[9],
                     }
+                }
+            
+            case "SEND_START":
+                data = struct.unpack("<B", bin_data)
+                return {
+                    "event": event,
+                    "start": bool(data[0])
+                }
+                
+            case "SEND_SIDE":
+                data = struct.unpack("<B", bin_data)
+                return {
+                    "event": event,
+                    "side": "yellow" if bool(data[0]) == 0 else "blue"
                 }
                 
             case _:

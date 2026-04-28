@@ -44,6 +44,8 @@ int __buffer_counter;
 #define SERVER_SET_ODOMETRY     74
 
 #define SERVER_SEND_LIDAR 110
+#define SERVER_SEND_SIDE  111
+#define SERVER_SEND_START 112
 
 
 
@@ -81,6 +83,8 @@ void HandleAPIServer() {
         if ( socket_server.hasClient() ) {
             socket_client = socket_server.accept();
             socket_connected = 1;
+            ServerSendSide(side);
+            ServerSendStart(starter_state);
             LogInfo("New socket client connected! IP: %s", socket_client.remoteIP().toString().c_str());
         }
         
@@ -119,7 +123,7 @@ void HandleData(uint8_t event, uint8_t *data) {
     
     switch (event) {
         case SERVER_SET_MOTORS_SPEED:
-            if ( data_size < 2 * sizeof(float)) {
+            if ( data_size < 2 * sizeof(float) || starter_state == STARTER_IN ) {
                 break;
             }
             WheelsSetSpeed(((float*)data)[0], ((float*)data)[1]);
@@ -193,6 +197,17 @@ void HandleData(uint8_t event, uint8_t *data) {
 }
 
 
+void ServerSendSide(byte side) {
+    NEW_MSG(SERVER_SEND_SIDE);
+    SET_SEND_DATA(byte, side);
+    SEND_MSG();
+}
+
+void ServerSendStart(bool start) {
+    NEW_MSG(SERVER_SEND_START);
+    SET_SEND_DATA(byte, start);
+    SEND_MSG();
+}
 
 
 

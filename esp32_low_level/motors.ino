@@ -25,10 +25,10 @@ void SetupWheels() {
     LogDebug("Setup wheels");
 
     pinMode(WHEEL_L_ENA, OUTPUT);
-    digitalWrite(WHEEL_L_ENA, 0);
+    digitalWrite(WHEEL_L_ENA, 1);
 
     pinMode(WHEEL_R_ENA, OUTPUT);
-    digitalWrite(WHEEL_R_ENA, 0);
+    digitalWrite(WHEEL_R_ENA, 1);
 
     // НЕ УБИРАТЬ (int32_t) ИЗ-ЗА ОСОБЕНОСТИ БИБЛИОТЕКИ!!!!!
     stepper_l.setSpeed((int32_t)0);

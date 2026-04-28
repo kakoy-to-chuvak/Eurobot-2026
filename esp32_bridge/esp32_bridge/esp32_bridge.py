@@ -90,6 +90,9 @@ class Esp32_Bridge(Node):
         
         self.servo_state = (0, 0, 0, 0)
         self.lift_height = 0
+        
+        self.start = 0
+        self.side = 'yellow'
 
         # Frame names
         self.declare_parameter("odom_frame", "pwb_odom")
@@ -191,7 +194,8 @@ class Esp32_Bridge(Node):
      
      
     def receive_motors_speed(self, msg):
-        self.esp_client.set_motors_speed(msg.linear.x, msg.angular.z)
+        if self.start:
+            self.esp_client.set_motors_speed(msg.linear.x, msg.angular.z)
         
     def receive_lift_height(self, msg):
         if msg.data < 0:
@@ -350,9 +354,18 @@ class Esp32_Bridge(Node):
                     self.publish_odometry()
                     self.publish_servo()
                     self.publish_lift_h()
+                case 'SEND_SIDE':
+                    self.side = msg['side']
+                    self.get_logger().info(f"Side: {self.side}")
+                    
+                case 'SEND_START':
+                    self.start = msg['start']
+                    self.get_logger().info(f"Start: {self.start}")
+                    if not self.start:
+                        self.esp_client.set_motors_speed(0.0, 0.0)
                     
                 case _:
-                    self.get_logger().warn("Undefine event type:", msg['event'])
+                    self.get_logger().warn("Undefine event type:" + msg['event'])
    
             msg = self.esp_client.receive_msg()
 

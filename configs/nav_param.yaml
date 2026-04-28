@@ -19,7 +19,7 @@ bt_navigator:
 controller_server:
   ros__parameters:
     use_sim_time: False
-    cmd_vel_topic: "cmd_vel_raw" 
+    cmd_vel_topic: "/cmd_vel" 
     controller_plugins: ["FollowPath"]
     
     # ПЕРЕНЕСЕНО ВОВНЕ (убран лишний вложенный controller_server)
@@ -27,8 +27,29 @@ controller_server:
     progress_checker_plugins: ["progress_checker"]
 
     FollowPath:
+      
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      # ... ваши параметры без изменений ...
+      desired_linear_vel: 0.25  # Уменьшено до 0.25
+      use_rotate_to_heading: true
+
+      
+      # Параметры вращения
+      rotate_to_heading_angular_vel: 2.5 # Скорость разворота на месте перед началом движения
+      max_angular_vel: 3.0               # Максимальная угловая скорость при движении
+      min_approach_linear_velocity: 0.05
+      rotate_to_heading_min_angle: 0.196
+      
+      # Регулировка скорости на поворотах (чтобы он не тормозил слишком сильно)
+      regulated_linear_scaling_min_speed: 0.1 
+
+      use_regulated_linear_velocity_scaling: false
+      use_cost_regulated_linear_velocity_scaling: false
+      
+      # УВЕЛИЧЬТЕ агрессивность поворота:
+      # Чем меньше это расстояние, тем круче робот будет брать повороты
+      lookahead_dist: 0.4 
+      min_lookahead_dist: 0.2
+      max_lookahead_dist: 0.5
 
     general_goal_checker:
       stateful: True
@@ -53,7 +74,7 @@ local_costmap:
       width: 3
       height: 3
       resolution: 0.03
-      footprint: "[[0.05, 0.05], [0.05, -0.05], [-0.05, -0.05], [-0.05, 0.05]]"
+      footprint: "[[0.2, 0.2], [0.2, -0.2], [-0.2, -0.2], [-0.2, 0.2]]"
       footprint_padding: 0.01
       plugins: ["obstacle_layer", "inflation_layer"]
       obstacle_layer:
@@ -73,7 +94,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
-        inflation_radius: 0.12
+        inflation_radius: 0.5
 
 global_costmap:
   global_costmap:
@@ -99,7 +120,7 @@ global_costmap:
           marking: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.12
+        inflation_radius: 0.5
         cost_scaling_factor: 4.0    
 
 planner_server:
@@ -143,14 +164,15 @@ behavior_server:
 
 velocity_smoother:
   ros__parameters:
-    input_topic: "cmd_vel_raw"
-    output_topic: "cmd_vel_smoothed"
+    input_topic: "/cmd_vel"
+    output_topic: "/cmd_vel_smoothed"
     enabled: true
     smoothing_frequency: 20.0
-    max_velocity: [0.5, 0.0, 2.0]
-    min_velocity: [-0.5, 0.0, -2.0]
-    max_accel: [2.5, 0.0, 3.2]
-    max_decel: [-2.5, 0.0, -3.2]
+    max_velocity: [0.25, 0.0, 3.0] 
+    min_velocity: [-0.25, 0.0, -3.0]
+    max_accel: [0.2, 0.0, 4.0]
+    max_decel: [-0.2, 0.0, -4.0]
+ 
 
 docking_server:
   ros__parameters:
@@ -180,7 +202,7 @@ collision_monitor:
     use_sim_time: False # Установите True, если вы в симуляторе
     base_frame_id: "base_link"
     odom_frame_id: "pwb_odom"
-    cmd_vel_in_topic: "cmd_vel_smoothed"
+    cmd_vel_in_topic: "/cmd_vel_smoothed"
     cmd_vel_out_topic: "/pwb/cmd_vel"
     state_topic: "collision_monitor_state"
     transform_tolerance: 0.2
@@ -193,9 +215,9 @@ collision_monitor:
       type: "polygon"
       action_type: "approach"
       footprint_topic: "/local_costmap/published_footprint"
-      time_before_collision: 1.2
+      time_before_collision: 0.2
       simulation_time_step: 0.1
-      min_points: 6
+      min_points: 2
       visualize: True
       enabled: True # Поменял на True, чтобы он работал
     # ИСТОЧНИКИ ДАННЫХ — здесь была ошибка

@@ -19,6 +19,7 @@
 uint32_t server_timer = 0;
 uint32_t odometry_timer = 0;    
 uint32_t servo_timer = 0;   // timer for smooth moving
+uint32_t sensors_timer = 0;
 
 // statistics
 uint32_t tps = 0; // ticks per second
@@ -27,6 +28,13 @@ uint32_t tps_timer = 0;
 uint32_t min_loop_time = 0;
 uint32_t max_loop_time = 0;
 
+#define STARTER_IN  0
+#define STARTER_OUT 1
+bool starter_state = STARTER_IN;
+
+#define SIDE_YELLOW 0
+#define SIDE_BLUE   1
+bool side = SIDE_YELLOW;
 
 void setup() {
     uint32_t setup_start_time = millis();
@@ -37,6 +45,10 @@ void setup() {
     SetupServo();
     SetupLift();
     // CalibrateLift();
+
+    // Инициализируем кнопки и переключатели
+    pinMode(STARTER, INPUT_PULLUP);
+    pinMode(SIDE_SWITCH, INPUT_PULLUP);
 
 #if CREATE_ACCESS
     // Creating access point
@@ -91,10 +103,34 @@ void loop() {
         odometry_timer = current_time;
     }
 
+    if ( millis() - sensors_timer > SENSORS_DELAY ) {
+        // check starter
+        byte tmp_state = !digitalRead(STARTER);
+        if ( tmp_state != starter_state ) {
+            starter_state = tmp_state;
+            ServerSendStart(starter_state);
+
+            if ( starter_state == STARTER_IN ) {
+                WheelsSetSpeed(0.0, 0.0);
+            }
+        }
+
+        // check side
+        tmp_state = !digitalRead(SIDE_SWITCH);
+        if ( side != tmp_state ) {
+            side = tmp_state;
+            ServerSendSide(side);
+        }
+
+        sensors_timer = millis();
+    }
+    
+    // statistics
     tps_counter++;
     uint32_t loop_time = millis() - current_time;
     if ( loop_time < min_loop_time ) {
-        min_loop_time = loop_time
+        min_loop_time = loop_time;
+
     }
     if ( loop_time > max_loop_time ) {
         max_loop_time = loop_time;
