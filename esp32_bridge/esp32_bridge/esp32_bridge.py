@@ -1,10 +1,14 @@
 import math
-
+import time
 
 try:
     import EspClientApi
-except:
-    from esp32_bridge import EspClientApi
+except ImportError:
+    # Если импорт не удался, возможно файл называется иначе или в другой папке
+    try:
+        from . import EspClientApi
+    except ImportError:
+        raise ImportError("Could not import EspClientApi module")
 
 import rclpy
 from rclpy.node import Node
@@ -67,9 +71,13 @@ class Esp32_Bridge(Node):
         # Connecting to server
         self.esp_client = EspClientApi.EspClient(self.host, self.port, self.get_logger().info)
         self.esp_client.connect()
+        self.esp_connected = True
+        self.last_esp_ping = time.perf_counter()
 
         self.lidar_client = EspClientApi.LidarClient(self.host, self.lidar_port, self.get_logger().info)
         self.lidar_client.connect()
+        self.lidar_connected = True
+        self.last_lidar_ping = time.perf_counter()
         
         # Ping server
         self.ping_timer = self.create_timer(0.1, self.ping_esp)
@@ -94,6 +102,8 @@ class Esp32_Bridge(Node):
         self.start = 0
         self.side = 'yellow'
 
+        
+
         # Frame names
         self.declare_parameter("odom_frame", "pwb_odom")
         self.declare_parameter("base_frame", "base_link")
@@ -112,11 +122,13 @@ class Esp32_Bridge(Node):
         self.lidar_frame = self.get_parameter("lidar_frame").value
         self.lift_frame  = self.get_parameter("lift_frame").value
         
-        
 
         # Frame relative cords
         self.declare_parameter("lidar_xyz", [0.0, 0.0, 0.40])
         self.declare_parameter("lidar_rpy_deg", [0.0, 0.0, 0.0]) # orientation
+        self.lidar_xyz = self.get_parameter("lidar_xyz").value
+        self.lidar_rpy = self.get_parameter("lidar_rpy_deg").value
+
 
         self.declare_parameter("lift_xyz",  [0.05, 0.0, 0.0])
         self.base_lift_xyz = self.get_parameter("lift_xyz").value
@@ -131,7 +143,8 @@ class Esp32_Bridge(Node):
         
         if len(self.servo_frames) != len(self.servos_pos):
             self.get_logger().error("Different count of servo_frames and servo_positions")
-            exit(-1)
+            rclpy.shutdown()
+            return
         
         # Lidar params
         self.declare_parameter("lidar_shift_deg", -15.0) # сдвиг облака CW
@@ -156,25 +169,25 @@ class Esp32_Bridge(Node):
         self.tf_br = TransformBroadcaster(self)
         self.static_br = StaticTransformBroadcaster(self)
         self._publish_static_tf()
-        
+        self.publish_odometry()
         
         
     def _publish_static_tf(self):
         # Publishing lidar frame  
-        rpy_deg = self.get_parameter("lidar_rpy_deg").value  
-        xyz = self.get_parameter("lidar_xyz").value
+        rpy_deg = self.get_parameter("lidar_rpy_deg").value
+        xyz = self.lidar_xyz
 
         tf = TransformStamped()
         tf.header.stamp = self.get_clock().now().to_msg()
-        tf.header.frame_id = self.base_frame
+        tf.header.frame_id = self.odom_frame
         tf.child_frame_id = self.lidar_frame
         tf.transform.translation.x = float(xyz[0])
         tf.transform.translation.y = float(xyz[1])
         tf.transform.translation.z = float(xyz[2])
         tf.transform.rotation = rpy_to_quat(rpy_deg[0], rpy_deg[1], rpy_deg[2])
         
-        self.static_br.sendTransform(tf)
-        self.get_logger().info("Published static TF base_link → lidar")
+        self.tf_br.sendTransform(tf)
+        self.get_logger().info("Published static TF odom → lidar")
 
 
         # Publishing odom frame
@@ -197,10 +210,7 @@ class Esp32_Bridge(Node):
         if self.start:
             self.esp_client.set_motors_speed(msg.linear.x, msg.angular.z)
         
-    def receive_lift_height(self, msg):
-        if msg.data < 0:
-            msg.data = 0.0
-            
+    def receive_lift_height(self, msg):            
         self.esp_client.set_lift_height(msg.data)
         
         
@@ -272,21 +282,45 @@ class Esp32_Bridge(Node):
         
     
     def ping_esp(self):
+        if not self.esp_connected:
+            if time.perf_counter() - self.last_esp_ping < 5.0:
+                return
+            
+            self.last_esp_ping = time.perf_counter()
+            self.get_logger().info("Trying to reconnect to ESP")
+            try:
+                self.esp_client.connect()
+                self.esp_connected = True
+                self.esp_client.get_all()  # Запрашиваем состояние после reconnect
+                self.get_logger().info("ESP reconnected")
+            except Exception as e:
+                self.get_logger().error(f"Reconnection failed: {e}")
+            return
+
         try:
             self.esp_client.get_all()
+            self.last_esp_ping = time.perf_counter()
+        except BlockingIOError:
+            if time.perf_counter() - self.last_esp_ping > 3.0:
+                self.get_logger().warn("ESP timeout, disconnecting")
+                self.esp_connected = False
+                self.esp_client.disconnect()
         except Exception as e:
-            self.get_logger().error("Couldn`t send message:" + str(e))
+            self.get_logger().error("Esp communication error:" + str(e))
+            self.esp_connected = False
+            self.esp_client.disconnect()
+            self.get_logger().warn("Esp disconnected")
+
             
     def publish_lidar(self, angles, ranges, intens):        
+        if len(angles) < 10 or len(ranges) < 10 or len(intens) < 10:
+            return None
+        
         if self.get_parameter("lidar_mirror").value:
             angles.reverse()
             ranges.reverse()
             intens.reverse()
             angles = [-a for a in angles]
-            
-        shift_deg = self.get_parameter("lidar_shift_deg").value
-        if shift_deg:
-            angles = [ang + shift_deg for ang in angles]
             
         # нормализуем, чтобы начало ≈ −π
         if angles[0] > 180.0:
@@ -305,6 +339,21 @@ class Esp32_Bridge(Node):
         scan.ranges = ranges
         scan.intensities = intens
         self.scan_pub.publish(scan)
+
+        xyz = self.lidar_xyz
+        rpy_deg = self.lidar_rpy
+        shift_deg = self.get_parameter("lidar_shift_deg").value
+
+        tf = TransformStamped()
+        tf.header.stamp = self.get_clock().now().to_msg()
+        tf.header.frame_id = self.odom_frame
+        tf.child_frame_id = self.lidar_frame
+        tf.transform.translation.x = float(xyz[0] + self.xPos)
+        tf.transform.translation.y = float(xyz[1] + self.yPos)
+        tf.transform.translation.z = float(xyz[2])
+        tf.transform.rotation = rpy_to_quat(rpy_deg[0], rpy_deg[1], rpy_deg[2] + math.radians(shift_deg) + self.theta)
+
+        self.tf_br.sendTransform(tf)
         
     def receive_esp_data(self):
         msg = self.esp_client.receive_msg()
@@ -369,19 +418,44 @@ class Esp32_Bridge(Node):
    
             msg = self.esp_client.receive_msg()
 
-        msg = self.lidar_client.receive_lidar()
-        if msg is not None:
-            self.publish_lidar(msg['angles'], msg['ranges'], msg['intens'])
+        # Receive lidar data
+        if self.lidar_connected:
+            msg = self.lidar_client.receive_lidar()
+            if msg is not None:
+                self.last_lidar_ping = time.perf_counter()
+                self.publish_lidar(msg['angles'], msg['ranges'], msg['intens'])
+
+            if time.perf_counter() - self.last_lidar_ping > 3.0:
+                self.get_logger().warn("Lidar server disconnected")
+                self.lidar_connected = False
+                self.lidar_client.disconnect()
+        else:
+            if time.perf_counter() - self.last_lidar_ping > 5.0:
+                self.get_logger().info("Try connect to lidar server")
+                self.last_lidar_ping = time.perf_counter()
+                try:
+                    self.lidar_client.connect()
+                    self.lidar_connected = True
+                    self.get_logger().info("Lidar connected")
+                except Exception as e:
+                    self.get_logger().info(f"Connection faied: {e}")
+
                 
 
 def main(args=None):
     rclpy.init(args=args)
 
     node = Esp32_Bridge()
-    rclpy.spin(node)
-    
-    node.destroy_node()
-    rclpy.shutdown()
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.esp_client.disconnect()
+        node.lidar_client.disconnect()
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

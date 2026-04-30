@@ -28,7 +28,7 @@ servo_timer = 0
 
 # Lidar simulation
 lidar_timer = 0
-lidar_delay = 0.05
+lidar_delay = 0.1
 
 # Odometry
 xPos = 0.0
@@ -159,10 +159,10 @@ class SocketClient:
                 self.send_msg("ANSWER_GET_SERVO_STATE", "BBBB", cur_servos[0], cur_servos[1], cur_servos[2], cur_servos[3])
 
             case "GET_ODOMETRY":
-                self.send_msg("ANSWER_GET_ODOMETRY", "fff", xPos, yPos, theta)
+                self.send_msg("ANSWER_GET_ODOMETRY", "fff", theta, xPos, yPos)
 
             case "GET_ALL":
-                self.send_msg("ANSWER_GET_ALL", "ffHBBBBfff", linear, angular, int(cur_height), cur_servos[0], cur_servos[1], cur_servos[2], cur_servos[3], xPos, yPos, theta)
+                self.send_msg("ANSWER_GET_ALL", "ffHBBBBfff", linear, angular, int(cur_height), cur_servos[0], cur_servos[1], cur_servos[2], cur_servos[3], theta, xPos, yPos)
 
             case "SET_MOTORS_SPEED":
                 linear, angular = struct.unpack("ff", data)
@@ -194,7 +194,7 @@ class SocketClient:
 # -------------------------- Server --------------------------
 HOST = "127.0.0.1"
 PORT = 8080
-LIDAR_PORT = 8091
+LIDAR_PORT = 8011
 
 esp_client = None
 
@@ -219,6 +219,9 @@ print(get_time(), "Lidar server created!")
 
 # -------------------------- Robot simulation --------------------------
 def get_angle(point: tuple) -> float:
+    if point[0] == 0 and point[1] == 0:
+        return 0.0
+    
     cos = point[0] / math.sqrt(point[0]**2 + point[1]**2)
     ang = -math.acos(cos)
 
@@ -301,8 +304,9 @@ def create_lidar_pkg(size: int) -> bytes:
 
         ang += ang_inc
 
-    if len(pkg) % 20:
-        pkg += ( 20 - (len(pkg) % 20) ) * struct.pack("<B", 0)
+    extra = len(pkg) % 20
+    if extra:
+        pkg = pkg[:-extra]  # Отрезаем лишние байты
 
     return pkg
 
@@ -388,7 +392,11 @@ def main():
         ComputeOdometry()
         SimulatServo()
         SimulateLift()
-        PublishLidar()
+
+        try:
+            PublishLidar()  
+        except:
+            pass
 
         if esp_client is not None:
             # handle client
@@ -404,6 +412,8 @@ def main():
                 new_client, addr = socket_server.accept()        
                 esp_client = SocketClient(new_client)
                 print(get_time(), "New client!")
+                esp_client.send_msg("SEND_START", "B", 1)
+                esp_client.send_msg("SEND_SIDE", "B", 1)
             except BlockingIOError:
                 pass
         

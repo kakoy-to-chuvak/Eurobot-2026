@@ -35,23 +35,30 @@ class EspClient():
         "SEND_SIDE"                  : 111,
     }
 
-    password = "374tfb39784"
-    
     def __init__(self, host, port, log_function = print):
         self.host = host
         self.port = port
         self.log = log_function
         
-        self.__client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__client = None
         self.sended_msgs = 0
         self.received_msgs = 0
+
+        # обратный солварь для быстрого поиска по именам
+        self.type_to_name = {v: k for k, v in self.message_types.items()}
         
         self.data_size = 0
        
     def connect(self, timeout=1.0):
+        try:
+            self.disconnect()
+        except:
+            pass
+
+        self.__client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__client.settimeout(timeout)
         self.__client.setblocking(True)
-        
+
         self.log(f"Connecting to server {self.host}:{self.port}")
         self.__client.connect((self.host, self.port))
         self.log("Connected!")
@@ -60,6 +67,8 @@ class EspClient():
         
     def disconnect(self) -> None:
         self.__client.close()
+        self.__client = None
+        self.data_size = 0 
         
     def create_msg(self, type: str, format: str, *args):
         data = struct.pack("<b" + format, self.message_types[type], *args)
@@ -68,6 +77,10 @@ class EspClient():
         return data
         
     def send_msg(self, type: str, format: str, *args) -> None:
+        if self.__client is None:
+            # self.log("Client not connected")
+            return
+        
         data = self.create_msg(type, format, *args)
 
         self.__client.sendall(data)
@@ -79,12 +92,16 @@ class EspClient():
         
     def available(self) -> int:
         try:
-            return len(self.__client.recv(4000, socket.MSG_PEEK))
+            return len(self.__client.recv(4096, socket.MSG_PEEK))
         except:
             return 0
         
         
     def receive_msg(self):
+        if self.__client is None:
+            # self.log("Client not connected")
+            return None
+        
         if self.data_size == 0:
             if self.available() < 2:
                 return None
@@ -103,13 +120,11 @@ class EspClient():
         
         event_type = struct.unpack("<b", bin_data[:1])[0]
         
-        try:
-            event = list(self.message_types.keys())[list(self.message_types.values()).index(event_type)]
-        except ValueError:
+        event = self.type_to_name.get(event_type)
+        if event is None:
             self.log(f"Undefined event type {event_type}")
             return None
-            
-        self.received_msgs += 1
+        
         bin_data = bin_data[1:]
         
         match event:
@@ -139,9 +154,9 @@ class EspClient():
                 data = struct.unpack("<fff", bin_data)
                 return {
                     "event" : event,
-                    "x"     : data[0],
-                    "y"     : data[1],
-                    "theta" : data[2],
+                    "theta" : data[0],
+                    "x"     : data[1],
+                    "y"     : data[2],
                 }
                 
             case "ANSWER_GET_ALL":
@@ -175,7 +190,7 @@ class EspClient():
                 data = struct.unpack("<B", bin_data)
                 return {
                     "event": event,
-                    "side": "yellow" if bool(data[0]) == 0 else "blue"
+                    "side": "yellow" if data[0] == 0 else "blue"
                 }
                 
             case _:
@@ -232,7 +247,7 @@ class LidarClient:
         self.port = port
         self.log = log_function
 
-        self.__client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__client = None
         self.data_size = 0
         self.sended_msgs = 0
         self.received_msgs = 0
@@ -244,6 +259,12 @@ class LidarClient:
         self.MAX_PKGS = 200 # max packages per rev
 
     def connect(self, timeout=1.0):
+        try:
+            self.disconnect()
+        except:
+            pass
+
+        self.__client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__client.settimeout(timeout)
         self.__client.setblocking(True)
         
@@ -255,6 +276,8 @@ class LidarClient:
         
     def disconnect(self) -> None:
         self.__client.close()
+        self.__client = None
+        self.data_size = 0 
 
     def convert_lidar(self, raw: bytes):
         package_len = len(raw) // self.FRAME_SIZE
@@ -288,6 +311,10 @@ class LidarClient:
         return (angles, ranges, intens)
     
     def receive_lidar(self):
+        if self.__client is None:
+            # self.log("Lidar client not connected")
+            return None
+        
         if self.data_size == 0:
             if self.available() < 2:
                 return None
