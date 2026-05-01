@@ -13,8 +13,8 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Daniil',
-    maintainer_email='kakoy-to-chuvak@yandex.ru',
+    maintainer='kakoy-to-chuvak',
+    maintainer_email='',
     description='TODO: Package description',
     license='TODO: License declaration',
     extras_require={

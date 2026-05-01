@@ -75,18 +75,6 @@ ros2 run your_package esp32_bridge.py --ros-args -p host:=192.168.1.100 -p port:
 - Проверка CRC пакетов
 - Конвертация углов и дистанций в LaserScan
 
-## Пример запуска с реальным роботом
-
-```bash
-# Запуск с параметрами для конкретного робота
-ros2 run your_package esp32_bridge.py \
-  --ros-args \
-  -p host:=192.168.1.100 \
-  -p port:=8080 \
-  -p lidar_port:=8090 \
-  -p lidar_xyz:=[0.05,0.0,0.35] \
-  -p lidar_rpy_deg:=[0.0,0.0,0.0]
-```
 
 ## Требования
 
