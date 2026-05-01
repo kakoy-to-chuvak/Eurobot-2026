@@ -10,8 +10,8 @@ from rclpy.node import Node
 
 
 class PathFollower(Node):
-        def __init__(self):
-                super().__init__('path_folower')
+    def __init__(self):
+        super().__init__('path_folower')
 
 
         
@@ -31,4 +31,4 @@ def main(args=None):
 
 
 if __name__ == "__main__":
-        main()
+    main()
