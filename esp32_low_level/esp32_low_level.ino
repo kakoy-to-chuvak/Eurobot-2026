@@ -28,6 +28,12 @@ uint32_t tps_timer = 0;
 uint32_t min_loop_time = 0;
 uint32_t max_loop_time = 0;
 
+// odom
+float theta = 0.0;
+float xPos = 0.0;
+float yPos = 0.0;
+
+
 #define STARTER_IN  0
 #define STARTER_OUT 1
 bool starter_state = STARTER_IN;

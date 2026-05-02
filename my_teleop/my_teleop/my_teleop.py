@@ -2,7 +2,7 @@ import rclpy
 import sys
 import signal
 
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import TwistStamped
 from std_msgs.msg import UInt8MultiArray, UInt16
 
 if sys.platform == 'win32':
@@ -114,6 +114,14 @@ def print_all(linear, angular, lift_h, servos, last_key=""):
     print(f"Lift height: {lift_h} mm\tServos: {servos}")
 
 
+def publish_twist(publisher, stamp, linear, angular):
+    twist = TwistStamped()
+    twist.header.stamp = stamp
+    twist.header.frame_id = "base_link"
+    twist.twist.linear.x = float(linear)
+    twist.twist.angular.z = float(angular)
+    publisher.publish(twist)
+
 def main(args=None):    
     if args is None:
         args = sys.argv
@@ -123,13 +131,13 @@ def main(args=None):
     rclpy.init(args=args)
     node = rclpy.create_node('my_teleop')
     
-    vel_pub   = node.create_publisher(Twist, '/pwb/cmd_vel', 10)
-    lift_pub  = node.create_publisher(UInt16, '/pwb/lift_target_height', 10)
+    vel_pub   = node.create_publisher(TwistStamped,    '/pwb/cmd_vel', 10)
+    lift_pub  = node.create_publisher(UInt16,          '/pwb/lift_target_height', 10)
     servo_pub = node.create_publisher(UInt8MultiArray, '/pwb/servos_target_angles', 10)
 
     # Настройки
-    max_linear = 0.5
-    max_angular = 1.0
+    linear = 0.5
+    angular = 1.0
     x_cmd = 0
     ang_cmd = 0
     
@@ -140,8 +148,7 @@ def main(args=None):
     # Обработчик Ctrl+C
     def signal_handler(sig, frame):
         print("\nStopping robot...")
-        twist = Twist()
-        vel_pub.publish(twist)
+        publish_twist(vel_pub, node.get_clock().now().to_msg(), 0.0, 0.0)
         restoreTerminalSettings(settings)
         node.destroy_node()
         rclpy.shutdown()
@@ -151,7 +158,7 @@ def main(args=None):
     
     try:
         print(msg)
-        print_all(max_linear, max_angular, lift_h, servos)
+        print_all(linear, angular, lift_h, servos)
         
         while rclpy.ok():
             key = getKey(settings)
@@ -159,25 +166,17 @@ def main(args=None):
             if key in moveBindings:
                 x_cmd = moveBindings[key][0]
                 ang_cmd = moveBindings[key][1]
-                
-                twist = Twist()
-                twist.linear.x = x_cmd * max_linear
-                twist.angular.z = ang_cmd * max_angular
-                vel_pub.publish(twist)
-                
-                print_all(max_linear, max_angular, lift_h, servos, key)
+                publish_twist(vel_pub, node.get_clock().now().to_msg(), x_cmd*linear, ang_cmd*angular)                
+                print_all(linear, angular, lift_h, servos, key)
 
             elif key in speedBindings:
-                max_linear = min(max_linear * speedBindings[key][0], MAX_LINEAR)
-                max_angular = min(max_angular * speedBindings[key][1], MAX_ANGULAR)
+                linear = min(linear * speedBindings[key][0], MAX_LINEAR)
+                angular = min(angular * speedBindings[key][1], MAX_ANGULAR)
                 
                 # Продолжаем текущее движение с новыми скоростями
-                twist = Twist()
-                twist.linear.x = x_cmd * max_linear
-                twist.angular.z = ang_cmd * max_angular
-                vel_pub.publish(twist)
+                publish_twist(vel_pub, node.get_clock().now().to_msg(), x_cmd*linear, ang_cmd*angular)
                 
-                print_all(max_linear, max_angular, lift_h, servos, key)
+                print_all(linear, angular, lift_h, servos, key)
             
             elif key in lift_binds:
                 lift_h += lift_binds[key]
@@ -187,7 +186,7 @@ def main(args=None):
                 lift_msg.data = int(lift_h)
                 lift_pub.publish(lift_msg)
                 
-                print_all(max_linear, max_angular, lift_h, servos, key)
+                print_all(linear, angular, lift_h, servos, key)
 
             elif key in servo_binds:
                 idx, delta = servo_binds[key]
@@ -198,7 +197,7 @@ def main(args=None):
                 servo_msg.data = servos
                 servo_pub.publish(servo_msg)
                 
-                print_all(max_linear, max_angular, lift_h, servos, key)
+                print_all(linear, angular, lift_h, servos, key)
                 
             elif key in all_servo_bind:
                 delta = all_servo_bind[key]
@@ -210,24 +209,17 @@ def main(args=None):
                 servo_msg.data = servos
                 servo_pub.publish(servo_msg)
                 
-                print_all(max_linear, max_angular, lift_h, servos, key)
+                print_all(linear, angular, lift_h, servos, key)
                 
             elif key == '\x03':  # Ctrl+C
+                publish_twist(vel_pub, node.get_clock().now().to_msg(), 0.0, 0.0)
                 break
-
-            else:
-                x_cmd = 0
-                ang_cmd = 0
-                twist = Twist()
-                vel_pub.publish(twist)
-                print_all(max_linear, max_angular, lift_h, servos, key)
 
     except Exception as e:
         print(f"Error: {e}")
     
     finally:
-        twist = Twist()
-        vel_pub.publish(twist)
+        publish_twist(vel_pub, node.get_clock().now().to_msg(), 0.0, 0.0)
         restoreTerminalSettings(settings)
         node.destroy_node()
         rclpy.shutdown()

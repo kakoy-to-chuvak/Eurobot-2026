@@ -1,0 +1,15 @@
+use_sim_time: false
+
+image: map.pgm
+
+resolution: 0.05
+
+origin: [-1.5, -1, 0.0]
+
+mode: trinary
+
+occupied_thresh: 1.0
+
+free_thresh: 0
+
+frame_id: map

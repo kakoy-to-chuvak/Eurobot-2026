@@ -15,7 +15,7 @@ from rclpy.node import Node
 
 # Messages
 from std_msgs.msg import UInt8MultiArray, UInt16
-from geometry_msgs.msg import Twist, Quaternion
+from geometry_msgs.msg import TwistStamped, Quaternion
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 
@@ -68,16 +68,14 @@ class Esp32_Bridge(Node):
         self.declare_parameter("lidar_port", 8090)
         self.lidar_port = self.get_parameter("lidar_port").value
         
-        # Connecting to server
+        # Creating client objects for future use
         self.esp_client = EspClientApi.EspClient(self.host, self.port, self.get_logger().info)
-        self.esp_client.connect()
-        self.esp_connected = True
-        self.last_esp_ping = time.perf_counter()
+        self.esp_connected = False
+        self.last_esp_ping = 0.0
 
         self.lidar_client = EspClientApi.LidarClient(self.host, self.lidar_port, self.get_logger().info)
-        self.lidar_client.connect()
-        self.lidar_connected = True
-        self.last_lidar_ping = time.perf_counter()
+        self.lidar_connected = False
+        self.last_lidar_ping = 0.0
         
         # Ping server
         self.ping_timer = self.create_timer(0.1, self.ping_esp)
@@ -160,7 +158,7 @@ class Esp32_Bridge(Node):
         
         
         # ROS subscriptions
-        self.cmd_vel_sub = self.create_subscription(Twist, '/pwb/cmd_vel', self.receive_motors_speed, 10)
+        self.cmd_vel_sub = self.create_subscription(TwistStamped, '/pwb/cmd_vel', self.receive_motors_speed, 10)
         self.lift_h_sub = self.create_subscription(UInt16, '/pwb/lift_target_height', self.receive_lift_height, 10)
         self.servo_pos_sub = self.create_subscription(UInt8MultiArray, '/pwb/servos_target_angles', self.receive_servo_state, 10)
         
@@ -173,23 +171,6 @@ class Esp32_Bridge(Node):
         
         
     def _publish_static_tf(self):
-        # Publishing lidar frame  
-        rpy_deg = self.get_parameter("lidar_rpy_deg").value
-        xyz = self.lidar_xyz
-
-        tf = TransformStamped()
-        tf.header.stamp = self.get_clock().now().to_msg()
-        tf.header.frame_id = self.odom_frame
-        tf.child_frame_id = self.lidar_frame
-        tf.transform.translation.x = float(xyz[0])
-        tf.transform.translation.y = float(xyz[1])
-        tf.transform.translation.z = float(xyz[2])
-        tf.transform.rotation = rpy_to_quat(rpy_deg[0], rpy_deg[1], rpy_deg[2])
-        
-        self.tf_br.sendTransform(tf)
-        self.get_logger().info("Published static TF odom → lidar")
-
-
         # Publishing odom frame
         tf = TransformStamped()
         tf.header.stamp = self.get_clock().now().to_msg()
@@ -206,15 +187,15 @@ class Esp32_Bridge(Node):
         
      
      
-    def receive_motors_speed(self, msg):
+    def receive_motors_speed(self, msg: TwistStamped):
         if self.start:
-            self.esp_client.set_motors_speed(msg.linear.x, msg.angular.z)
+            self.esp_client.set_motors_speed(msg.twist.linear.x, msg.twist.angular.z)
         
-    def receive_lift_height(self, msg):            
+    def receive_lift_height(self, msg: UInt16):            
         self.esp_client.set_lift_height(msg.data)
         
         
-    def receive_servo_state(self, msg):
+    def receive_servo_state(self, msg: UInt8MultiArray):
         self.esp_client.set_servo_state(msg.data)
         
         
@@ -301,7 +282,7 @@ class Esp32_Bridge(Node):
             self.esp_client.get_all()
             self.last_esp_ping = time.perf_counter()
         except BlockingIOError:
-            if time.perf_counter() - self.last_esp_ping > 3.0:
+            if time.perf_counter() - self.last_esp_ping > 5.0:
                 self.get_logger().warn("ESP timeout, disconnecting")
                 self.esp_connected = False
                 self.esp_client.disconnect()
@@ -311,8 +292,9 @@ class Esp32_Bridge(Node):
             self.esp_client.disconnect()
             self.get_logger().warn("Esp disconnected")
 
-            
-    def publish_lidar(self, angles, ranges, intens):        
+
+
+    def publish_lidar(self, angles: list, ranges: list, intens: list, lidar_theta: float, lidar_x: float, lidar_y: float):        
         if len(angles) < 10 or len(ranges) < 10 or len(intens) < 10:
             return None
         
@@ -348,10 +330,10 @@ class Esp32_Bridge(Node):
         tf.header.stamp = self.get_clock().now().to_msg()
         tf.header.frame_id = self.odom_frame
         tf.child_frame_id = self.lidar_frame
-        tf.transform.translation.x = float(xyz[0] + self.xPos)
-        tf.transform.translation.y = float(xyz[1] + self.yPos)
+        tf.transform.translation.x = float(xyz[0] + lidar_x)
+        tf.transform.translation.y = float(xyz[1] + lidar_y)
         tf.transform.translation.z = float(xyz[2])
-        tf.transform.rotation = rpy_to_quat(rpy_deg[0], rpy_deg[1], rpy_deg[2] + math.radians(shift_deg) + self.theta)
+        tf.transform.rotation = rpy_to_quat(rpy_deg[0], rpy_deg[1], rpy_deg[2] + shift_deg + lidar_theta)
 
         self.tf_br.sendTransform(tf)
         
@@ -423,7 +405,7 @@ class Esp32_Bridge(Node):
             msg = self.lidar_client.receive_lidar()
             if msg is not None:
                 self.last_lidar_ping = time.perf_counter()
-                self.publish_lidar(msg['angles'], msg['ranges'], msg['intens'])
+                self.publish_lidar(msg['angles'], msg['ranges'], msg['intens'], msg['theta'], msg['x'], msg['y'])
 
             if time.perf_counter() - self.last_lidar_ping > 3.0:
                 self.get_logger().warn("Lidar server disconnected")
@@ -438,7 +420,9 @@ class Esp32_Bridge(Node):
                     self.lidar_connected = True
                     self.get_logger().info("Lidar connected")
                 except Exception as e:
-                    self.get_logger().info(f"Connection faied: {e}")
+                    self.get_logger().error(f"Connection faied: {e}")
+
+        
 
                 
 

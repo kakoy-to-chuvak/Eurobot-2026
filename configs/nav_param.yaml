@@ -1,7 +1,7 @@
 bt_navigator:
   ros__parameters:
     use_sim_time: False                         # Использовать симуляционное время
-    global_frame: pwb_odom                      # Глобальная система координат
+    global_frame: map                      # Глобальная система координат
     robot_base_frame: base_link                 # Базовая система координат робота
     odom_topic: /pwb/odom                       # Топик одометрии
     bt_loop_duration: 10                        # Длительность цикла Behavior Tree (мс)
@@ -19,6 +19,7 @@ bt_navigator:
 
 controller_server:
   ros__parameters:
+    enable_stamped_cmd_vel: True
     use_sim_time: False                         # Использовать симуляционное время
     cmd_vel_topic: "/cmd_vel"                   # Топик команд скорости
     controller_plugins: ["FollowPath"]          # Плагины контроллера
@@ -31,7 +32,7 @@ controller_server:
       desired_linear_vel: 0.25                    # Желаемая линейная скорость (м/с)
       use_rotate_to_heading: false                # Использовать разворот перед движением
       rotate_to_heading_angular_vel: 2.5          # Угловая скорость разворота (рад/с)
-      max_angular_vel: 3.0                        # Максимальная угловая скорость (рад/с)
+      max_angular_vel: 1.5                        # Максимальная угловая скорость (рад/с)
       min_approach_linear_velocity: 0.05          # Минимальная скорость при подходе (м/с)
       rotate_to_heading_min_angle: 0.196          # Минимальный угол для разворота (рад)
       regulated_linear_scaling_min_speed: 0.1     # Минимальная скорость при регулировании (м/с)
@@ -57,7 +58,7 @@ local_costmap:
     ros__parameters:
       update_frequency: 5.0                       # Частота обновления (Гц)
       publish_frequency: 2.0                      # Частота публикации (Гц)
-      global_frame: pwb_odom                      # Глобальная система координат
+      global_frame: map                      # Глобальная система координат
       robot_base_frame: base_link                 # Базовая система координат робота
       rolling_window: true                        # Окно перемещается за роботом
       width: 3                                    # Ширина карты (м)
@@ -90,9 +91,9 @@ global_costmap:
     ros__parameters:
       update_frequency: 1.0                       # Частота обновления (Гц)
       publish_frequency: 1.0                      # Частота публикации (Гц)
-      global_frame: pwb_odom                      # Глобальная система координат
+      global_frame: map                      # Глобальная система координат
       robot_base_frame: base_link                 # Базовая система координат робота
-      rolling_window: true                        # Окно перемещается за роботом
+      rolling_window: false                        # Окно перемещается за роботом
       width: 10                                   # Ширина карты (м)
       height: 10                                  # Высота карты (м)
       resolution: 0.05                            # Разрешение карты (м/пиксель)
@@ -117,13 +118,13 @@ planner_server:
     expected_planner_frequency: 10.0              # Ожидаемая частота планировщика (Гц)
     use_sim_time: False                           # Использовать симуляционное время
     use_final_approach_orientation: true          # Использовать ориентацию при финальном подходе
-    global_frame: pwb_odom                        # Глобальная система координат
+    global_frame: map                        # Глобальная система координат
     robot_base_frame: base_link                   # Базовая система координат робота
     planner_plugins: ["GridBased"]                # Плагины планировщика
     GridBased:
       plugin: "nav2_navfn_planner::NavfnPlanner"  # Плагин навигационного планировщика
       tolerance: 0.1                              # Допуск (м)
-      use_astar: false                            # Использовать A* алгоритм
+      use_astar: true                             # Использовать A* алгоритм
       allow_unknown: true                         # Разрешить неизвестные области
 
 behavior_server:
@@ -142,13 +143,14 @@ behavior_server:
       plugin: "nav2_behaviors::DriveOnHeading"    # Плагин движения по курсу
     wait:
       plugin: "nav2_behaviors::Wait"              # Плагин ожидания
-    global_frame: pwb_odom                        # Глобальная система координат
+    global_frame: map                        # Глобальная система координат
     local_frame: pwb_odom                         # Локальная система координат
     robot_base_frame: base_link                   # Базовая система координат робота
     transform_tolerance: 0.1                      # Допуск трансформации (сек)
 
 velocity_smoother:
   ros__parameters:
+    enable_stamped_cmd_vel: True
     input_topic: "/cmd_vel"                       # Входной топик команд скорости
     output_topic: "/cmd_vel_smoothed"             # Выходной топик сглаженных команд
     enabled: true                                 # Сглаживание включено
@@ -168,7 +170,7 @@ docking_server:
     undock_angular_tolerance: 0.1                 # Угловой допуск при отстыковке (рад)
     max_retries: 3                                # Максимальное количество попыток
     base_frame: "base_link"                       # Базовая система координат
-    fixed_frame: "pwb_odom"                       # Фиксированная система координат
+    fixed_frame: "map"                       # Фиксированная система координат
     dock_backwards: false                         # Стыковка задним ходом
     dock_plugins: ['simple_charging_dock']        # Плагины стыковки
     simple_charging_dock:
@@ -188,7 +190,7 @@ collision_monitor:
     odom_frame_id: "pwb_odom"                     # Идентификатор одометрической системы координат
     cmd_vel_in_topic: "/cmd_vel_smoothed"         # Входной топик команд скорости
     cmd_vel_out_topic: "/pwb/cmd_vel"             # Выходной топик команд скорости
-    state_topic: "collision_monitor_state"        # Топик состояния монитора коллизий
+    state_topic: "/collision_monitor_state"        # Топик состояния монитора коллизий
     transform_tolerance: 0.2                      # Допуск трансформации (сек)
     source_timeout: 1.0                           # Таймаут источника данных (сек)
     base_shift_correction: True                   # Коррекция смещения базы

@@ -3,10 +3,6 @@
 
 
 
-float theta = 0.0;
-float xPos = 0.0;
-float yPos = 0.0;
-
 int32_t prev_current_l = 0;
 int32_t prev_current_r = 0;
 

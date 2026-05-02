@@ -11,29 +11,32 @@ def constrain(a, min_value, max_value):
         return max_value
     return a
 
+MESSAGE_TYPES = {
+    "GET_ALL"                    : 10,
+    "GET_MOTORS_SPEED"           : 11,
+    "GET_LIFT_HEIGHT"            : 12,
+    "GET_SERVO_STATE"            : 13,
+    "GET_ODOMETRY"               : 14,
+    
+    "ANSWER_GET_ALL"             : 40,
+    "ANSWER_GET_MOTORS_SPEED"    : 41,
+    "ANSWER_GET_LIFT_HEIGHT"     : 42,
+    "ANSWER_GET_SERVO_STATE"     : 43,
+    "ANSWER_GET_ODOMETRY"        : 44,
+    
+    "SET_MOTORS_SPEED"           : 71,
+    "SET_LIFT_HEIGHT"            : 72,
+    "SET_SERVO_STATE"            : 73,
+    "SET_ODOMETRY"               : 74,
+    
+    "SEND_LIDAR"                 : 110,
+    "SEND_START"                 : 112,
+    "SEND_SIDE"                  : 111,
+}
+
 class EspClient():
     
-    message_types = {
-        "GET_ALL"                    : 10,
-        "GET_MOTORS_SPEED"           : 11,
-        "GET_LIFT_HEIGHT"            : 12,
-        "GET_SERVO_STATE"            : 13,
-        "GET_ODOMETRY"               : 14,
-        
-        "ANSWER_GET_ALL"             : 40,
-        "ANSWER_GET_MOTORS_SPEED"    : 41,
-        "ANSWER_GET_LIFT_HEIGHT"     : 42,
-        "ANSWER_GET_SERVO_STATE"     : 43,
-        "ANSWER_GET_ODOMETRY"        : 44,
-        
-        "SET_MOTORS_SPEED"           : 71,
-        "SET_LIFT_HEIGHT"            : 72,
-        "SET_SERVO_STATE"            : 73,
-        "SET_ODOMETRY"               : 74,
-        
-        "SEND_START"                 : 112,
-        "SEND_SIDE"                  : 111,
-    }
+    
 
     def __init__(self, host, port, log_function = print):
         self.host = host
@@ -45,7 +48,7 @@ class EspClient():
         self.received_msgs = 0
 
         # обратный солварь для быстрого поиска по именам
-        self.type_to_name = {v: k for k, v in self.message_types.items()}
+        self.type_to_name = {v: k for k, v in MESSAGE_TYPES.items()}
         
         self.data_size = 0
        
@@ -66,12 +69,15 @@ class EspClient():
         self.__client.setblocking(False)
         
     def disconnect(self) -> None:
-        self.__client.close()
+        try:
+            self.__client.close()
+        except:
+            pass
         self.__client = None
         self.data_size = 0 
         
     def create_msg(self, type: str, format: str, *args):
-        data = struct.pack("<b" + format, self.message_types[type], *args)
+        data = struct.pack("<b" + format, MESSAGE_TYPES[type], *args)
         data = struct.pack("<H", len(data)) + data
         
         return data
@@ -82,7 +88,6 @@ class EspClient():
             return
         
         data = self.create_msg(type, format, *args)
-
         self.__client.sendall(data)
         self.sended_msgs += 1
         
@@ -93,7 +98,10 @@ class EspClient():
     def available(self) -> int:
         try:
             return len(self.__client.recv(4096, socket.MSG_PEEK))
-        except:
+        except BlockingIOError:
+            return 0
+        except Exception as e:
+            # self.log(str(e))
             return 0
         
         
@@ -275,7 +283,10 @@ class LidarClient:
         self.__client.setblocking(False)
         
     def disconnect(self) -> None:
-        self.__client.close()
+        try:
+            self.__client.close()
+        except:
+            pass
         self.__client = None
         self.data_size = 0 
 
@@ -312,9 +323,8 @@ class LidarClient:
     
     def receive_lidar(self):
         if self.__client is None:
-            # self.log("Lidar client not connected")
             return None
-        
+
         if self.data_size == 0:
             if self.available() < 2:
                 return None
@@ -323,38 +333,74 @@ class LidarClient:
                 self.log(f"Too big data size: {self.data_size}")
                 self.data_size = 0
                 return None
-            
+
         if self.available() < self.data_size:
             return None
 
         bin_data = self.__client.recv(self.data_size)
         self.received_msgs += 1
         self.data_size = 0
-        
-        # Check for wrong data
-        if not ( self.FRAME_SIZE + self.CRC_SIZE <= len(bin_data) <= self.MAX_PKGS * self.FRAME_SIZE + self.CRC_SIZE ):
-            self.log("Wrong data size")
+
+        # Новый формат: [тип][theta][x][y][данные_лидара][CRC16]
+        if len(bin_data) < 1 + 12 + self.FRAME_SIZE + self.CRC_SIZE:
+            self.log("Packet too short")
             return None
-        
-        if crc16(bin_data[:-2]) != int.from_bytes(bin_data[-2:], "little"):
+
+        offset = 0
+        msg_type = bin_data[offset]
+        offset += 1
+
+        # Проверяем тип сообщения (110 = LIDAR_MSG_DATA)
+        if msg_type != MESSAGE_TYPES["SEND_LIDAR"]:
+            self.log(f"Unexpected lidar message type: {msg_type}")
+            return None
+
+        # Читаем одометрию
+        theta, xPos, yPos = struct.unpack("<fff", bin_data[offset:offset + 12])
+        offset += 12
+
+        # Остаток данных - лидар + CRC
+        remaining = len(bin_data) - offset
+
+        # Проверяем минимальную длину
+        if remaining < self.FRAME_SIZE + self.CRC_SIZE:
+            self.log(f"Not enough lidar data: {remaining} bytes")
+            return None
+
+        # Отделяем данные лидара и CRC
+        lidar_raw = bin_data[offset:offset + remaining - self.CRC_SIZE]
+        received_crc = int.from_bytes(bin_data[-self.CRC_SIZE:], "little")
+
+        # Проверяем CRC
+        if crc16(lidar_raw) != received_crc:
             self.log("Wrong crc")
             return None
-                
-        lidar_data = self.convert_lidar(bin_data[:-2])
 
-        if lidar_data == None:
-            self.log("Failed convertion")
+        # Проверяем размер данных лидара
+        if len(lidar_raw) < self.FRAME_SIZE or len(lidar_raw) > self.MAX_PKGS * self.FRAME_SIZE:
+            self.log(f"Wrong lidar data size: {len(lidar_raw)}")
             return None
-                
+
+        # Конвертируем лидарные данные
+        lidar_data = self.convert_lidar(lidar_raw)
+        if lidar_data is None:
+            self.log("Failed conversion")
+            return None
+
         return {
             "angles": lidar_data[0],
             "ranges": lidar_data[1],
             "intens": lidar_data[2],
+            "theta": theta,  
+            "x": xPos,           
+            "y": yPos,           
         }
-        
         
     def available(self) -> int:
         try:
             return len(self.__client.recv(4000, socket.MSG_PEEK))
-        except:
+        except BlockingIOError:
+            return 0
+        except Exception as e:
+            # self.log(str(e))
             return 0

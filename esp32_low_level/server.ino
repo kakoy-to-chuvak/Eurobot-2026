@@ -24,31 +24,6 @@ int __buffer_counter;
                         sended_messages++;  }while(0)
 
 
-// Server events
-#define SERVER_GET_ALL 10
-#define SERVER_GET_MOTORS_SPEED 11
-#define SERVER_GET_LIFT_HEIGHT  12
-#define SERVER_GET_SERVO_STATE  13
-#define SERVER_GET_ODOMETRY     14
-
-#define SERVER_ANSWER_GET_ALL 40
-#define SERVER_ANSWER_GET_MOTORS_SPEED 41
-#define SERVER_ANSWER_GET_LIFT_HEIGHT  42
-#define SERVER_ANSWER_GET_SERVO_STATE  43
-#define SERVER_ANSWER_GET_ODOMETRY     44
-
-
-#define SERVER_SET_MOTORS_SPEED 71
-#define SERVER_SET_LIFT_HEIGHT  72
-#define SERVER_SET_SERVO_STATE  73
-#define SERVER_SET_ODOMETRY     74
-
-#define SERVER_SEND_LIDAR 110
-#define SERVER_SEND_SIDE  111
-#define SERVER_SEND_START 112
-
-
-
 
 WiFiServer socket_server(SERVER_PORT);
 WiFiClient socket_client;

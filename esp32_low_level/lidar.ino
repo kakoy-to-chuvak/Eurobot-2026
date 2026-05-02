@@ -20,6 +20,8 @@ static uint8_t frameCount = 0;
 static float prevStartAngle = -1;
 
 
+
+
 // // UDP serverw
 WiFiServer lidar_server(LIDAR_PORT);
 WiFiClient lidar_client;
@@ -41,6 +43,32 @@ void ProcessLidarServer() {
 
         return;
     }
+}
+
+void SendLidarPacket(uint8_t* data, size_t dataSize, float theta, float xPos, float yPos) {
+    if ( !lidar_client.connected() ) {
+        return;  
+    } 
+
+    uint8_t startBuf[64] = {0};
+    uint8_t offset = 0;
+
+    *((uint16_t*)(startBuf + offset)) = 1 + 3 * sizeof(float) + dataSize;
+    offset += 2;
+    startBuf[offset] = SERVER_SEND_LIDAR;
+    offset += 1;
+    *((float*)(startBuf + offset)) = theta;
+    offset += 4;
+    *((float*)(startBuf + offset)) = xPos;
+    offset += 4;
+    *((float*)(startBuf + offset)) = yPos;
+    offset += 4;
+    
+    
+    lidar_client.write((uint8_t*)&startBuf, offset);
+    lidar_client.write(data, dataSize);
+    
+    LogTrace("Sent lidar packet: size=%u, theta=%.3f, x=%.3f, y=%.3f", offset + dataSize, theta, xPos, yPos);
 }
 
 // ==== Helper lidar functions ====
@@ -96,7 +124,7 @@ void LidarTask(void *_Param) {
 
     StartLidarServer();
 
-    
+
     while (true) {
         vTaskDelay(1);
 
@@ -159,9 +187,7 @@ void LidarTask(void *_Param) {
             // Отправляем по Socket
             if ( lidar_client.connected() ) {
                 LogTrace("Sending lidar");
-                uint16_t length = scanSize + 2;
-                lidar_client.write((uint8_t*)&length, 2);
-                lidar_client.write(scanBuf, length);
+                SendLidarPacket(scanBuf, scanSize + 2, theta, xPos, yPos);
             }
 
             // Сбрасываем буфер для следующего оборота

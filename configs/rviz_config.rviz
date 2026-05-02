@@ -3,15 +3,7 @@ Panels:
     Help Height: 78
     Name: Displays
     Property Tree Widget:
-      Expanded:
-        - /Grid1
-        - /TF1
-        - /TF1/Frames1
-        - /TF1/Frames1/lidar1
-        - /TF1/Tree1/map1
-        - /TF1/Tree1/map1/pwb_odom1
-        - /TF1/Tree1/map1/pwb_odom1/base_link1
-        - /TF1/Tree1/map1/pwb_odom1/base_link1/lift1
+      Expanded: ~
       Splitter Ratio: 0.6839237213134766
     Tree Height: 742
   - Class: rviz_common/Selection
@@ -219,25 +211,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 3.656202554702759
+      Distance: 9.841290473937988
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.9457318782806396
-        Y: 0.09365565329790115
-        Z: 0.038659486919641495
+        X: 0.5149306654930115
+        Y: 0.6204274892807007
+        Z: -0.48901432752609253
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.599797248840332
+      Pitch: 1.2597966194152832
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.0885564088821411
+      Yaw: 4.725462436676025
     Saved: ~
 Window Geometry:
   Displays:
