@@ -1,211 +1,311 @@
 bt_navigator:
   ros__parameters:
-    use_sim_time: False                         # Использовать симуляционное время
-    global_frame: map                      # Глобальная система координат
-    robot_base_frame: base_link                 # Базовая система координат робота
-    odom_topic: /pwb/odom                       # Топик одометрии
-    bt_loop_duration: 10                        # Длительность цикла Behavior Tree (мс)
-    default_server_timeout: 20                  # Таймаут сервера по умолчанию (мс)
-    wait_for_service_timeout: 1000              # Таймаут ожидания сервиса (мс)
-    action_server_result_timeout: 900.0         # Таймаут результата action сервера (сек)
-    navigators: ["navigate_to_pose", "navigate_through_poses"]  # Список навигаторов
+    use_sim_time: False
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: /pwb/odom
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    wait_for_service_timeout: 5000
+    action_server_result_timeout: 900.0
+    navigators: ["navigate_to_pose", "navigate_through_poses"]
     navigate_to_pose:
-      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"      # Плагин навигации к позе
+      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
     navigate_through_poses:
-      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator" # Плагин навигации через позы
-    error_code_names:                           # Список кодов ошибок
-      - compute_path_error_code                 # Ошибка вычисления пути
-      - follow_path_error_code                  # Ошибка следования по пути
+      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+    error_code_names:
+      - compute_path_error_code
+      - follow_path_error_code
+
+map_server:
+  ros__parameters:
+    yaml_filename: "/home/robotx/ros2_ws/map/map.yaml"
+    topic_name: "/map"
+    frame_id: "map"
 
 controller_server:
   ros__parameters:
     enable_stamped_cmd_vel: True
-    use_sim_time: False                         # Использовать симуляционное время
-    cmd_vel_topic: "/cmd_vel"                   # Топик команд скорости
-    controller_plugins: ["FollowPath"]          # Плагины контроллера
+    use_sim_time: False
+    cmd_vel_topic: "/cmd_vel_nav"
+    controller_plugins: ["FollowPath"]
+    transform_tolerance: 1.0
     
-    goal_checker_plugins: ["general_goal_checker"]  # Плагины проверки достижения цели
-    progress_checker_plugins: ["progress_checker"]  # Плагины проверки прогресса
-
+    goal_checker_plugins: ["general_goal_checker"]
+    progress_checker_plugins: ["progress_checker"]
+    controller_frequency: 10.0
+    
     FollowPath:
-      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"  # Плагин контроллера
-      desired_linear_vel: 0.25                    # Желаемая линейная скорость (м/с)
-      use_rotate_to_heading: false                # Использовать разворот перед движением
-      rotate_to_heading_angular_vel: 2.5          # Угловая скорость разворота (рад/с)
-      max_angular_vel: 1.5                        # Максимальная угловая скорость (рад/с)
-      min_approach_linear_velocity: 0.05          # Минимальная скорость при подходе (м/с)
-      rotate_to_heading_min_angle: 0.196          # Минимальный угол для разворота (рад)
-      regulated_linear_scaling_min_speed: 0.1     # Минимальная скорость при регулировании (м/с)
-      use_regulated_linear_velocity_scaling: true # Использовать регулирование линейной скорости
-      use_cost_regulated_linear_velocity_scaling: true # Учитывать стоимость при регулировании
-      lookahead_dist: 0.4                         # Дистанция упреждения (м)
-      min_lookahead_dist: 0.2                     # Минимальная дистанция упреждения (м)
-      max_lookahead_dist: 0.5                     # Максимальная дистанция упреждения (м)
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      
+      # Базовые ограничения скоростей
+      desired_linear_vel: 0.3
+      max_linear_vel: 0.5
+      min_linear_vel: 0.05
+      max_angular_vel: 1.5
+      
+      # Параметры Pure Pursuit
+      lookahead_dist: 0.6
+      min_lookahead_dist: 0.3
+      max_lookahead_dist: 0.9
+      
+      # Ускорения
+      acc_lim_x: 0.2
+      acc_lim_theta: 4.0
+      
+      # Регулирование скорости
+      use_velocity_scaled_lookahead: true
+      use_rotate_to_heading: false
+      rotate_to_heading_angular_vel: 1.5
+      rotate_to_heading_min_angle: 0.196
+      
+      # Ограничения при подходе
+      min_approach_linear_velocity: 0.05
+      use_interpolation: true
+      
+      # Регулирование скорости на основе стоимости
+      use_cost_regulated_linear_velocity_scaling: false
+      cost_scaling_factor: 4.0
+      cost_scaling_threshold: 0.5
+      
+      # Допуски
+      xy_goal_tolerance: 0.05
+      yaw_goal_tolerance: 0.05
+      transform_tolerance: 0.5
 
     general_goal_checker:
-      stateful: True                              # Сохранять состояние
-      plugin: "nav2_controller::SimpleGoalChecker"  # Плагин простой проверки цели
-      xy_goal_tolerance: 0.1                      # Допуск по позиции XY (м)
-      yaw_goal_tolerance: 0.20                    # Допуск по углу (рад)
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.05
+      yaw_goal_tolerance: 0.05
       
     progress_checker:
-      plugin: "nav2_controller::SimpleProgressChecker"  # Плагин проверки прогресса
-      required_movement_radius: 0.1               # Радиус требуемого движения (м)
-      movement_time_allowance: 5.0                # Допустимое время движения (сек)
-      
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.1
+      movement_time_allowance: 5.0
+
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 5.0                       # Частота обновления (Гц)
-      publish_frequency: 2.0                      # Частота публикации (Гц)
-      global_frame: map                      # Глобальная система координат
-      robot_base_frame: base_link                 # Базовая система координат робота
-      rolling_window: true                        # Окно перемещается за роботом
-      width: 3                                    # Ширина карты (м)
-      height: 3                                   # Высота карты (м)
-      resolution: 0.03                            # Разрешение карты (м/пиксель)
-      footprint: "[[0.2, 0.2], [0.2, -0.2], [-0.2, -0.2], [-0.2, 0.2]]"  # Форма робота (м)
-      footprint_padding: 0.01                     # Отступ вокруг формы (м)
-      plugins: ["obstacle_layer", "inflation_layer"]  # Слои карты
+      transform_tolerance: 1.0
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: map
+      robot_base_frame: base_link
+      rolling_window: true
+      width: 4
+      height: 4
+      resolution: 0.05
+      footprint: "[[0.2, 0.2], [0.2, -0.2], [-0.2, -0.2], [-0.2, 0.2]]"
+      footprint_padding: 0.01
+      plugins: ["obstacle_layer", "inflation_layer"]
+      
       obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"  # Плагин слоя препятствий
-        enabled: True                             # Слой включен
-        observation_sources: scan                 # Источники наблюдений
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
         scan:
-          topic: /pwb/lidar_scan                  # Топик лидара
-          max_obstacle_height: 2.0                # Максимальная высота препятствия (м)
-          clearing: True                          # Очищать препятствия
-          marking: True                           # Отмечать препятствия
-          data_type: "LaserScan"                  # Тип данных
-          raytrace_max_range: 3.0                 # Максимальная дальность трассировки лучей (м)
-          raytrace_min_range: 0.0                 # Минимальная дальность трассировки лучей (м)
-          obstacle_max_range: 3.0                 # Максимальная дальность обнаружения (м)
-          obstacle_min_range: 0.0                 # Минимальная дальность обнаружения (м)
+          topic: /pwb/lidar_scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.1
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.1
+          
       inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer" # Плагин слоя инфляции
-        cost_scaling_factor: 4.0                  # Коэффициент масштабирования стоимости
-        inflation_radius: 0.5                     # Радиус инфляции (м)
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 4.0
+        inflation_radius: 0.15
 
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 1.0                       # Частота обновления (Гц)
-      publish_frequency: 1.0                      # Частота публикации (Гц)
-      global_frame: map                      # Глобальная система координат
-      robot_base_frame: base_link                 # Базовая система координат робота
-      rolling_window: false                        # Окно перемещается за роботом
-      width: 10                                   # Ширина карты (м)
-      height: 10                                  # Высота карты (м)
-      resolution: 0.05                            # Разрешение карты (м/пиксель)
-      footprint: "[[0.2, 0.2], [0.2, -0.2], [-0.2, -0.2], [-0.2, 0.2]]"  # Форма робота
-      plugins: ["obstacle_layer", "inflation_layer"]  # Слои карты
+      transform_tolerance: 1.0
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      rolling_window: true
+      width: 20
+      height: 20
+      resolution: 0.1
+      footprint: "[[0.2, 0.2], [0.2, -0.2], [-0.2, -0.2], [-0.2, 0.2]]"
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+      
       obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"  # Плагин слоя препятствий
-        enabled: True                             # Слой включен
-        observation_sources: scan                 # Источники наблюдений
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
         scan:
-          topic: /pwb/lidar_scan                  # Топик лидара
-          data_type: "LaserScan"                  # Тип данных
-          clearing: True                          # Очищать препятствия
-          marking: True                           # Отмечать препятствия
+          topic: /pwb/lidar_scan
+          data_type: "LaserScan"
+          clearing: True
+          marking: True
+          obstacle_max_range: 2.5
+          
       inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer" # Плагин слоя инфляции
-        inflation_radius: 0.5                     # Радиус инфляции (м)
-        cost_scaling_factor: 4.0                  # Коэффициент масштабирования стоимости
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.25
+        cost_scaling_factor: 4.0
 
 planner_server:
   ros__parameters:
-    expected_planner_frequency: 10.0              # Ожидаемая частота планировщика (Гц)
-    use_sim_time: False                           # Использовать симуляционное время
-    use_final_approach_orientation: true          # Использовать ориентацию при финальном подходе
-    global_frame: map                        # Глобальная система координат
-    robot_base_frame: base_link                   # Базовая система координат робота
-    planner_plugins: ["GridBased"]                # Плагины планировщика
+    transform_tolerance: 1.0
+    expected_planner_frequency: 5.0
+    use_sim_time: False
+    use_final_approach_orientation: true
+    global_frame: map
+    robot_base_frame: base_link
+    planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_navfn_planner::NavfnPlanner"  # Плагин навигационного планировщика
-      tolerance: 0.1                              # Допуск (м)
-      use_astar: true                             # Использовать A* алгоритм
-      allow_unknown: true                         # Разрешить неизвестные области
+      plugin: "nav2_navfn_planner::NavfnPlanner"
+      tolerance: 0.1
+      use_astar: false
+      allow_unknown: true
 
 behavior_server:
   ros__parameters:
-    local_costmap_topic: local_costmap/costmap_raw    # Топик локальной карты стоимости
-    global_costmap_topic: global_costmap/costmap_raw  # Топик глобальной карты стоимости
-    local_footprint_topic: local_costmap/published_footprint  # Топик локальной формы
-    global_footprint_topic: global_costmap/published_footprint # Топик глобальной формы
-    cycle_frequency: 10.0                         # Частота цикла (Гц)
-    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]  # Плагины поведения
+    enable_stamped_cmd_vel: True
+    local_costmap_topic: local_costmap/costmap_raw
+    global_costmap_topic: global_costmap/costmap_raw
+    local_footprint_topic: local_costmap/published_footprint
+    global_footprint_topic: global_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]
+    
     spin:
-      plugin: "nav2_behaviors::Spin"              # Плагин вращения
+      plugin: "nav2_behaviors::Spin"
     backup:
-      plugin: "nav2_behaviors::BackUp"            # Плагин движения назад
+      plugin: "nav2_behaviors::BackUp"
     drive_on_heading:
-      plugin: "nav2_behaviors::DriveOnHeading"    # Плагин движения по курсу
+      plugin: "nav2_behaviors::DriveOnHeading"
     wait:
-      plugin: "nav2_behaviors::Wait"              # Плагин ожидания
-    global_frame: map                        # Глобальная система координат
-    local_frame: pwb_odom                         # Локальная система координат
-    robot_base_frame: base_link                   # Базовая система координат робота
-    transform_tolerance: 0.1                      # Допуск трансформации (сек)
+      plugin: "nav2_behaviors::Wait"
+    
+    global_frame: map
+    local_frame: pwb_odom
+    robot_base_frame: base_link
+    transform_tolerance: 1.0
 
 velocity_smoother:
   ros__parameters:
     enable_stamped_cmd_vel: True
-    input_topic: "/cmd_vel"                       # Входной топик команд скорости
-    output_topic: "/cmd_vel_smoothed"             # Выходной топик сглаженных команд
-    enabled: true                                 # Сглаживание включено
-    smoothing_frequency: 20.0                     # Частота сглаживания (Гц)
-    max_velocity: [0.25, 0.0, 3.0]                # Максимальная скорость (линейная X, Y, угловая Z) (м/с, рад/с)
-    min_velocity: [-0.25, 0.0, -3.0]              # Минимальная скорость (линейная X, Y, угловая Z) (м/с, рад/с)
-    max_accel: [0.2, 0.0, 4.0]                    # Максимальное ускорение (м/с², рад/с²)
-    max_decel: [-0.2, 0.0, -4.0]                  # Максимальное замедление (м/с², рад/с²)
- 
+    input_topic: "/cmd_vel_nav"
+    output_topic: "/cmd_vel_smoothed"
+    enabled: true
+    smoothing_frequency: 20.0
+    max_velocity: [0.5, 0.0, 1.5]
+    min_velocity: [-0.5, 0.0, -1.5]
+    max_accel: [0.3, 0.0, 4.0]
+    max_decel: [-0.3, 0.0, -4.0]
+
 docking_server:
   ros__parameters:
-    controller_frequency: 50.0                    # Частота контроллера стыковки (Гц)
-    initial_perception_timeout: 5.0               # Таймаут начального восприятия (сек)
-    wait_charge_timeout: 5.0                      # Таймаут ожидания зарядки (сек)
-    dock_approach_timeout: 30.0                   # Таймаут подхода к стыковке (сек)
-    undock_linear_tolerance: 0.05                 # Линейный допуск при отстыковке (м)
-    undock_angular_tolerance: 0.1                 # Угловой допуск при отстыковке (рад)
-    max_retries: 3                                # Максимальное количество попыток
-    base_frame: "base_link"                       # Базовая система координат
-    fixed_frame: "map"                       # Фиксированная система координат
-    dock_backwards: false                         # Стыковка задним ходом
-    dock_plugins: ['simple_charging_dock']        # Плагины стыковки
+    enable_stamped_cmd_vel: True
+    controller_frequency: 50.0
+    initial_perception_timeout: 5.0
+    wait_charge_timeout: 5.0
+    dock_approach_timeout: 30.0
+    undock_linear_tolerance: 0.05
+    undock_angular_tolerance: 0.1
+    max_retries: 3
+    base_frame: "base_link"
+    fixed_frame: "map"
+    dock_backwards: false
+    dock_plugins: ['simple_charging_dock']
     simple_charging_dock:
-      plugin: 'opennav_docking::SimpleChargingDock'  # Плагин простой зарядной станции
-      docking_threshold: 0.05                     # Порог стыковки (м)
-      staging_x_offset: -0.7                      # Смещение по X для позиционирования (м)
-      use_external_detection_pose: true           # Использовать внешнее определение позы
-      use_battery_status: false                   # Использовать статус батареи
-      use_stall_detection: false                  # Использовать определение застревания
-      external_detection_timeout: 1.0             # Таймаут внешнего определения (сек)
-      filter_timeout: 0.1                         # Таймаут фильтра (сек)
+      plugin: 'opennav_docking::SimpleChargingDock'
+      docking_threshold: 0.05
+      staging_x_offset: -0.7
+      use_external_detection_pose: true
+      use_battery_status: false
+      use_stall_detection: false
+      external_detection_timeout: 1.0
+      filter_timeout: 0.1
 
 collision_monitor:
   ros__parameters:
-    use_sim_time: False                           # Использовать симуляционное время
-    base_frame_id: "base_link"                    # Идентификатор базовой системы координат
-    odom_frame_id: "pwb_odom"                     # Идентификатор одометрической системы координат
-    cmd_vel_in_topic: "/cmd_vel_smoothed"         # Входной топик команд скорости
-    cmd_vel_out_topic: "/pwb/cmd_vel"             # Выходной топик команд скорости
-    state_topic: "/collision_monitor_state"        # Топик состояния монитора коллизий
-    transform_tolerance: 0.2                      # Допуск трансформации (сек)
-    source_timeout: 1.0                           # Таймаут источника данных (сек)
-    base_shift_correction: True                   # Коррекция смещения базы
-    stop_pub_timeout: 2.0                         # Таймаут публикации остановки (сек)
-    polygons: ["FootprintApproach"]               # Список полигонов
+    use_sim_time: False
+    base_frame_id: "base_link"
+    odom_frame_id: "pwb_odom"
+    cmd_vel_in_topic: "/cmd_vel_smoothed"
+    cmd_vel_out_topic: "/pwb/cmd_vel"
+    state_topic: "/collision_monitor_state"
+    transform_tolerance: 0.5
+    source_timeout: 1.0
+    base_shift_correction: True
+    stop_pub_timeout: 2.0
+    
+    polygons: ["FootprintApproach"]
+    
     FootprintApproach:
-      type: "polygon"                             # Тип: полигон
-      action_type: "approach"                     # Тип действия: подход
-      footprint_topic: "/local_costmap/published_footprint"  # Топик формы робота
-      time_before_collision: 0.2                  # Время до коллизии (сек)
-      simulation_time_step: 0.1                   # Шаг времени симуляции (сек)
-      min_points: 2                               # Минимальное количество точек
-      visualize: True                             # Визуализировать
-      enabled: True                               # Монитор включен
-    observation_sources: ["scan"]                 # Источники наблюдений
+      type: "polygon"
+      action_type: "approach"
+      footprint_topic: "/local_costmap/published_footprint"
+      time_before_collision: 0.5
+      simulation_time_step: 0.1
+      min_points: 3
+      visualize: True
+      enabled: True
+    
+    observation_sources: ["scan"]
+    
     scan:
-      type: "scan"                                # Тип источника: сканирование
-      topic: "/pwb/lidar_scan"                    # Топик лидара
+      type: "scan"
+      topic: "/pwb/lidar_scan"
+      min_height: -0.5
+      max_height: 0.5
+      min_range: 0.1
+      max_range: 3.0
+
+amcl:
+  ros__parameters:
+    use_sim_time: False
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    base_frame_id: "base_link"
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    do_beamskip: false
+    global_frame_id: "map"
+    lambda_short: 0.1
+    laser_likelihood_max_dist: 2.0
+    laser_max_range: 10.0
+    laser_min_range: 0.1
+    laser_model_type: "likelihood_field"
+    max_beams: 60
+    max_particles: 2000
+    min_particles: 500
+    odom_frame_id: "pwb_odom"
+    pf_err: 0.05
+    pf_z: 0.99
+    recovery_alpha_slow: 0.0
+    recovery_alpha_fast: 0.0
+    robot_model_type: "diff"
+    save_pose_rate: 0.5
+    sigma_hit: 0.2
+    tf_broadcast: true
+    transform_tolerance: 1.0
+    update_min_a: 0.2
+    update_min_d: 0.25
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+    scan_topic: /pwb/lidar_scan
+    set_initial_pose: true
+    initial_pose.x: 0.0
+    initial_pose.y: 0.0
+    initial_pose.z: 0.0
+    initial_pose.yaw: 0.0   

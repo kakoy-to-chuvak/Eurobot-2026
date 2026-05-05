@@ -53,6 +53,7 @@ class RobotState:
         if self._last_odom_time == 0.0:
             self._last_odom_time = now
             return
+        
         dt = now - self._last_odom_time
         ds = self.linear_speed * dt
 
@@ -73,6 +74,7 @@ class RobotState:
         if self._last_lift_time == 0.0:
             self._last_lift_time = now
             return
+        
         dt = now - self._last_lift_time
         if self.lift_current < self.lift_target:
             self.lift_current += self.lift_speed * dt
@@ -129,7 +131,7 @@ class LidarServer:
         self._last_noise_update = time.perf_counter()
 
         # Параметры публикации
-        self._publish_delay = 0.2          # 5 Гц
+        self._publish_delay = 0.1          # 5 Гц
         self._last_publish_time = 0.0
 
         # Сокет
@@ -440,6 +442,8 @@ class EspServer:
         if self._server_socket:
             self._server_socket.close()
         self.running = False
+        self.robot.angular_speed = 0.0
+        self.robot.linear_speed = 0.0
 
 
 # -------------------------- Главный цикл --------------------------
