@@ -167,6 +167,8 @@ void LidarTask(void *_Param) {
         frameCount++;
 
         if (frameCount >= MAX_FRAMES) {
+            LogTrace("Sending lidar");
+            SendLidarPacket(scanBuf, scanSize + 2, theta, xPos, yPos);
             frameCount = 0;
             wr = scanBuf;
             prevStartAngle = -1;    // сброс для корректного «перескока» угла

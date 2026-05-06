@@ -58,7 +58,7 @@ constexpr uint16_t LIFT_R_STEPS_PER_MM = LIFT_STEPS_PER_REV / LIFT_R_MM_PER_REV 
 // Speed and delays
 const unsigned long DELAY_PER_SERVO[4] = { 20, 20, 20, 20 };
 
-#define SERVER_DELAY   5 // delay between calls
+#define SERVER_DELAY   5  // delay between calls
 #define ODOMETRY_DELAY 50 // delay between 
 #define SENSORS_DELAY  50
 
