@@ -15,7 +15,7 @@ from rclpy.node import Node
 
 # Messages
 from std_msgs.msg import UInt8MultiArray, UInt16
-from geometry_msgs.msg import TwistStamped, Quaternion
+from geometry_msgs.msg import Twist, Quaternion
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 
@@ -107,11 +107,11 @@ class Esp32_Bridge(Node):
         self.parameters = Parameters(self)
         
         # Объекты клиентов для подключения
-        self.esp_client = EspClientApi.EspClient(self.parameters.host, self.parameters.port, self.get_logger().info)
+        self.esp_client = EspClientApi.EspClient(self.parameters.host, self.parameters.port, logger=self.get_logger())
         self.esp_connected = False
         self.last_esp_ping = 0.0
 
-        self.lidar_client = EspClientApi.LidarClient(self.parameters.host, self.parameters.lidar_port, self.get_logger().info)
+        self.lidar_client = EspClientApi.LidarClient(self.parameters.host, self.parameters.lidar_port, logger=self.get_logger())
         self.lidar_connected = False
         self.last_lidar_ping = 0.0
         
@@ -151,7 +151,7 @@ class Esp32_Bridge(Node):
         
         
         # ROS subscriptions
-        self.cmd_vel_sub = self.create_subscription(TwistStamped, '/pwb/cmd_vel', self.receive_motors_speed, 10)
+        self.cmd_vel_sub = self.create_subscription(Twist, '/pwb/cmd_vel', self.receive_motors_speed, 10)
         self.lift_h_sub = self.create_subscription(UInt16, '/pwb/lift_target_height', self.receive_lift_height, 10)
         self.servo_pos_sub = self.create_subscription(UInt8MultiArray, '/pwb/servos_target_angles', self.receive_servo_state, 10)
         
@@ -176,13 +176,13 @@ class Esp32_Bridge(Node):
 
         
         self.static_br.sendTransform(tf)
-        self.get_logger().info("Published static TF map → odom")
+        self.get_logger().debug("Published static TF map → odom")
         
      
      
-    def receive_motors_speed(self, msg: TwistStamped):
+    def receive_motors_speed(self, msg: Twist):
         if self.start:
-            self.esp_client.set_motors_speed(msg.twist.linear.x, msg.twist.angular.z)
+            self.esp_client.set_motors_speed(msg.linear.x, msg.angular.z)
         
     def receive_lift_height(self, msg: UInt16):            
         self.esp_client.set_lift_height(msg.data)
@@ -261,24 +261,23 @@ class Esp32_Bridge(Node):
                 return
             
             self.last_esp_ping = time.perf_counter()
-            self.get_logger().info("Trying to reconnect to ESP")
-            try:
-                self.esp_client.connect()
+            self.get_logger().info("Connecting to ESP")
+
+            if self.esp_client.connect():
                 self.esp_connected = True
                 self.esp_client.get_all()  # Запрашиваем состояние после reconnect
-                self.get_logger().info("ESP reconnected")
-            except Exception as e:
-                self.get_logger().error(f"Reconnection failed: {e}")
-            return
+                self.get_logger().info("ESP connected")
+            else:
+                self.get_logger().error(f"Connection failed")
 
-        try:
-            self.esp_client.get_all()
-            self.last_esp_ping = time.perf_counter()
-        except Exception as e:
-            self.get_logger().error("Esp communication error:" + str(e))
+        if not self.esp_client.is_connected():
             self.esp_connected = False
             self.esp_client.disconnect()
-            self.get_logger().warn("Esp disconnected")
+            self.get_logger().error("Esp disconnected")
+
+        self.esp_client.get_all()
+        self.last_esp_ping = time.perf_counter()
+
     
     def publish_lidar_tf(self):
         xyz = self.parameters.lidar_xyz
@@ -287,8 +286,8 @@ class Esp32_Bridge(Node):
         tf.header.stamp = self.get_clock().now().to_msg()
         tf.header.frame_id = self.parameters.odom_frame
         tf.child_frame_id = self.parameters.lidar_frame
-        tf.transform.translation.x = float(xyz[0] + self.lidar_x)
-        tf.transform.translation.y = float(xyz[1] + self.lidar_y)
+        tf.transform.translation.x = float(xyz[0] * math.cos(self.lidar_theta) - xyz[1] * math.sin(self.lidar_theta) + self.lidar_x)
+        tf.transform.translation.y = float(xyz[0] * math.sin(self.lidar_theta) + xyz[1] * math.cos(self.lidar_theta) + self.lidar_y)
         tf.transform.translation.z = float(xyz[2])
         tf.transform.rotation = rpy_to_quat(0.0, 0.0, self.parameters.lidar_shift_deg + self.lidar_theta)
         self.tf_br.sendTransform(tf)
@@ -400,12 +399,11 @@ class Esp32_Bridge(Node):
             if time.perf_counter() - self.last_lidar_ping > 5.0:
                 self.get_logger().info("Try connect to lidar server")
                 self.last_lidar_ping = time.perf_counter()
-                try:
-                    self.lidar_client.connect()
+                if self.lidar_client.connect():
                     self.lidar_connected = True
                     self.get_logger().info("Lidar connected")
-                except Exception as e:
-                    self.get_logger().error(f"Connection faied: {e}")
+                else:
+                    self.get_logger().error(f"Lidar connection faied")
 
 
                 
@@ -419,11 +417,11 @@ def main(args=None):
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
+
     finally:
         node.esp_client.disconnect()
         node.lidar_client.disconnect()
         node.destroy_node()
-        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

@@ -55,6 +55,9 @@ class RobotState:
             return
         
         dt = now - self._last_odom_time
+        if dt > 0.5:
+            return
+        
         ds = self.linear_speed * dt
 
         self.theta += self.angular_speed * dt
@@ -136,6 +139,7 @@ class LidarServer:
 
         # Сокет
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._server_socket.bind((self.host, self.port))
         self._server_socket.listen()
         self._server_socket.setblocking(False)
@@ -184,10 +188,6 @@ class LidarServer:
         return ang % (2 * math.pi)
 
     def _transform_line(self, line: list, robot_x: float, robot_y: float) -> tuple:
-        """
-        Преобразует отрезок в систему координат робота.
-        Возвращает (угол_начала, угол_конца, угол_между_лучом_и_отрезком, расстояние_до_отрезка)
-        """
         p0 = [line[0][0] - robot_x, line[0][1] - robot_y]
         p1 = [line[1][0] - robot_x, line[1][1] - robot_y]
 
@@ -300,6 +300,7 @@ class LidarServer:
         """Закрывает сокет сервера."""
         if self._server_socket:
             self._server_socket.close()
+            self._server_socket.shutdown()
 
 
 # -------------------------- Обработчик одного клиента ESP --------------------------
@@ -316,7 +317,7 @@ class EspClientHandler:
     def send_msg(self, msg_type: str, fmt: str, *args) -> None:
         """Отправляет сообщение клиенту в протоколе EspClient."""
         try:
-            data = struct.pack("<b" + fmt, MESSAGE_TYPES[msg_type], *args)
+            data = struct.pack("<B" + fmt, MESSAGE_TYPES[msg_type], *args)
             data = struct.pack("<H", len(data)) + data
             self.sock.sendall(data)
         except Exception as e:
@@ -373,6 +374,7 @@ class EspClientHandler:
 
             case "SET_ODOMETRY":
                 robot.x, robot.y, robot.theta = struct.unpack("fff", payload)
+                print(f"set odom: {robot.x} {robot.y}")
 
             case "SET_LIFT_HEIGHT":
                 h = struct.unpack("H", payload)[0]
@@ -404,6 +406,7 @@ class EspServer:
         self.port = port
         self.robot = RobotState()
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._server_socket.bind((self.host, self.port))
         self._server_socket.listen()
         self._server_socket.setblocking(False)
@@ -428,6 +431,8 @@ class EspServer:
             # Отправить стартовые сообщения
             self._client_handler.send_msg("SEND_START", "B", 1)
             self._client_handler.send_msg("SEND_SIDE", "B", 1)
+
+            self.robot._last_odom_time = time.perf_counter()
         except BlockingIOError:
             pass
 
@@ -444,6 +449,7 @@ class EspServer:
         """Закрывает серверный сокет."""
         if self._server_socket:
             self._server_socket.close()
+            self._server_socket.shutdown()
         self.running = False
         self.robot.angular_speed = 0.0
         self.robot.linear_speed = 0.0
@@ -453,7 +459,7 @@ class EspServer:
 def main():
     HOST = "127.0.0.1"
     PORT = 8080
-    LIDAR_PORT = 8091
+    LIDAR_PORT = 8090
 
     esp_server = EspServer(HOST, PORT)
     lidar_server = LidarServer(HOST, LIDAR_PORT)
@@ -470,9 +476,13 @@ def main():
             # Лидар (использует текущий угол робота)
             lidar_server.publish(esp_server.robot.theta, esp_server.robot.x, esp_server.robot.y)
 
-            time.sleep(0.001)   # небольшая пауза для снижения загрузки CPU
+            time.sleep(0.01)   # небольшая пауза для снижения загрузки CPU
+    
     except KeyboardInterrupt:
         log("Shutting down...")
+        esp_server.stop()
+        lidar_server.stop()
+
     finally:
         esp_server.stop()
         lidar_server.stop()

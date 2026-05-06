@@ -1,6 +1,7 @@
 import socket
 import struct
 import threading
+import time
 from collections import deque
 
 
@@ -39,18 +40,33 @@ LIDAR_MESSAGE_TYPES = {
 }
 
 
+class DefaultLogger:
+    def info(self, *args):
+        print(f"[INFO] [{time.perf_counter():.7f}]", *args)
+
+    def warn(self, *args):
+        print(f"[WARN] [{time.perf_counter():.7f}]", *args)
+    
+    def error(self, *args):
+        print(f"[ERROR] [{time.perf_counter():.7f}]", *args)
+
+    def fatal(self, *args):
+        print(f"[FATAL] [{time.perf_counter():.7f}]", *args)
+
+    def debug(self, *args):
+        print(f"[DEBUG] [{time.perf_counter():.7f}]", *args)
 
 class AsyncSocket:
     def __init__(self, 
                  host: str,
                  port: int, 
-                 log_function = print, 
+                 logger = DefaultLogger(), 
                  socket_timeout: float = 0.5, 
                  max_pkg_size: int = 1024,
                  supported_messages: dict[str, int] = None ):
         self.host = host
         self.port = port
-        self.log = log_function
+        self.logger = logger
         self.socket_timeout = socket_timeout
         self.max_pkg_size = max_pkg_size
 
@@ -69,7 +85,7 @@ class AsyncSocket:
 
     def create_msg(self, type: str, format: str, *args):
         if type not in self.supported_messages:
-            self.log(f"Unknown message type: {type}")
+            self.logger.warn(f"Unknown message type: {type}")
             return None
         
         data = struct.pack("<b" + format, self.supported_messages[type], *args)
@@ -88,7 +104,7 @@ class AsyncSocket:
                 self.socket.sendall(msg)
                 self.sended_msgs += 1 
             except Exception as e:
-                self.log(f"Send error: {str(e)}")
+                self.logger.error(f"Send error: {str(e)}")
                 self.disconnect()
 
     def is_connected(self) -> bool:
@@ -108,7 +124,7 @@ class AsyncSocket:
             except socket.timeout:
                 continue
             except (ConnectionError, BrokenPipeError, OSError) as e:
-                self.log(f"Recv error: {e}")
+                self.logger.error(f"Recv error: {e}")
                 return None
         return bytes(data)
     
@@ -123,18 +139,19 @@ class AsyncSocket:
         self.socket.setblocking(True)
 
         try:
-            self.log(f"Connecting to server {self.host}:{self.port}")
+            self.logger.debug(f"Connecting to server {self.host}:{self.port}")
             self.socket.connect((self.host, self.port))
-            self.log("Connected!")
+            self.logger.debug(f"Connected! ({self.host}:{self.port})")
             self.socket.settimeout(self.socket_timeout)
 
-            self.log("Start reading thread...")
+            self.logger.debug("Start reading thread...")
             self.running = True
             self.__thread = threading.Thread(target=self._reader_thread, daemon=True)
             self.__thread.start()
             return True
+        
         except Exception as e:
-            self.log(f"Connection failed: {e}")
+            self.logger.error(f"Connection to server {self.host}:{self.port} failed: {e}")
             if self.socket:
                 self.socket.close()
             return False
@@ -151,14 +168,17 @@ class AsyncSocket:
         self.socket = None
 
         # Ждём завершение потока
-        if self.__thread and self.__thread.is_alive():
-            self.__thread.join(timeout=1.0)
-            if self.__thread.is_alive():
-                self.log("Warning: reader thread did not terminate")
-        self.__thread = None
+        try:
+            if self.__thread and self.__thread.is_alive():
+                self.__thread.join(timeout=1.0)
+                if self.__thread.is_alive():
+                    self.logger.warn("Warning: reader thread did not terminate")
+            self.__thread = None
+        except:
+            pass
 
     def _reader_thread(self):
-        self.log(f"Reading thread started {self.running} {self.socket is not None}")
+        self.logger.debug(f"Reading thread started {self.running} {self.socket is not None}")
         try:
             while self.running and self.socket is not None:
                 try:
@@ -170,7 +190,7 @@ class AsyncSocket:
                     if data_size == 0:
                         continue
                     if data_size > self.max_pkg_size:
-                        self.log(f"Invalid pkg size: {data_size}")
+                        self.logger.error(f"Invalid pkg size: {data_size}. Disconnecting")
                         break
                     
                     data = self._recv_exact(data_size)
@@ -183,14 +203,17 @@ class AsyncSocket:
                 except socket.timeout:
                     continue
                 except Exception as e:
-                    self.log(f"Reader error: {str(e)}")
+                    self.logger.error(f"Reader error: {str(e)}")
                     break
         finally:
             self.disconnect()
 
 class EspClient(AsyncSocket):
-    def __init__(self, host: str, port: int, log_function = print, socket_timeout: float = 0.5):
-        super().__init__(host, port, log_function, socket_timeout, 64, MESSAGE_TYPES)
+    def __init__( self, host: str,
+                  port: int, 
+                  logger = print, 
+                  socket_timeout: float = 0.5 ):
+        super().__init__(host, port, logger, socket_timeout, 64, MESSAGE_TYPES)
 
         # обратный солварь для быстрого поиска по именам
         self.type_to_name = {v: k for k, v in MESSAGE_TYPES.items()}
@@ -207,7 +230,7 @@ class EspClient(AsyncSocket):
         
         event = self.type_to_name.get(event_type)
         if event is None:
-            self.log(f"Undefined event type {event_type}")
+            self.logger.warn(f"Undefined event type {event_type}")
             return None
         
         bin_data = bin_data[1:]
@@ -337,8 +360,11 @@ class LidarClient(AsyncSocket):
     CRC_SIZE = 2
     MAX_PKGS = 200 # max packages per rev                    
 
-    def __init__(self, host: str, port: int, log_function = print, socket_timeout: float = 1.5):
-        super().__init__(host, port, log_function, socket_timeout, self.MAX_PKGS * self.FRAME_SIZE + 1 + 12 +self.CRC_SIZE, LIDAR_MESSAGE_TYPES)
+    def __init__( self, host: str,
+                  port: int, 
+                  logger = print, 
+                  socket_timeout: float = 1.5):
+        super().__init__(host, port, logger, socket_timeout, self.MAX_PKGS * self.FRAME_SIZE + 1 + 12 +self.CRC_SIZE, LIDAR_MESSAGE_TYPES)
         
     def convert_lidar(self, raw: bytes):
         package_len = len(raw) // self.FRAME_SIZE
@@ -381,7 +407,7 @@ class LidarClient(AsyncSocket):
 
         # Новый формат: [тип][theta][x][y][данные_лидара][CRC16]
         if len(bin_data) < 1 + 12 + self.FRAME_SIZE + self.CRC_SIZE:
-            self.log("Packet too short")
+            self.logger.warn("Packet too short")
             return None
 
         offset = 0
@@ -390,7 +416,7 @@ class LidarClient(AsyncSocket):
 
         # Проверяем тип сообщения (110 = LIDAR_MSG_DATA)
         if msg_type != LIDAR_MESSAGE_TYPES["SEND_LIDAR"]:
-            self.log(f"Unexpected lidar message type: {msg_type}")
+            self.logger.warn(f"Unexpected lidar message type: {msg_type}")
             return None
 
         # Читаем одометрию
@@ -402,7 +428,7 @@ class LidarClient(AsyncSocket):
 
         # Проверяем минимальную длину
         if remaining < self.FRAME_SIZE + self.CRC_SIZE:
-            self.log(f"Not enough lidar data: {remaining} bytes")
+            self.logger.warn(f"Not enough lidar data: {remaining} bytes")
             return None
 
         # Отделяем данные лидара и CRC
@@ -411,18 +437,18 @@ class LidarClient(AsyncSocket):
 
         # Проверяем CRC
         if crc16(lidar_raw) != received_crc:
-            self.log("Wrong crc")
+            self.logger.warn("Wrong crc")
             return None
 
         # Проверяем размер данных лидара
         if len(lidar_raw) < self.FRAME_SIZE or len(lidar_raw) > self.MAX_PKGS * self.FRAME_SIZE:
-            self.log(f"Wrong lidar data size: {len(lidar_raw)}")
+            self.logger.warn(f"Wrong lidar data size: {len(lidar_raw)}")
             return None
 
         # Конвертируем лидарные данные
         lidar_data = self.convert_lidar(lidar_raw)
         if lidar_data is None:
-            self.log("Failed conversion")
+            self.logger.warn("Failed conversion")
             return None
 
         return {

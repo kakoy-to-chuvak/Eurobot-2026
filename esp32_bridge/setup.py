@@ -15,8 +15,8 @@ setup(
     zip_safe=True,
     maintainer='kakoy-to-chuvak',
     maintainer_email='',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='',
+    license='',
     extras_require={
         'test': [
             'pytest',

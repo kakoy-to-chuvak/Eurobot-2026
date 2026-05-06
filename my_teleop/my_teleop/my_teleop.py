@@ -2,7 +2,7 @@ import rclpy
 import sys
 import signal
 
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import Twist
 from std_msgs.msg import UInt8MultiArray, UInt16
 
 if sys.platform == 'win32':
@@ -116,11 +116,9 @@ def print_all(linear, angular, lift_h, servos, last_key=""):
 
 
 def publish_twist(publisher, stamp, linear, angular):
-    twist = TwistStamped()
-    twist.header.stamp = stamp
-    twist.header.frame_id = "base_link"
-    twist.twist.linear.x = float(linear)
-    twist.twist.angular.z = float(angular)
+    twist = Twist()
+    twist.linear.x = float(linear)
+    twist.angular.z = float(angular)
     publisher.publish(twist)
 
 def main(args=None):    
@@ -132,7 +130,7 @@ def main(args=None):
     rclpy.init(args=args)
     node = rclpy.create_node('my_teleop')
     
-    vel_pub   = node.create_publisher(TwistStamped,    '/pwb/cmd_vel', 10)
+    vel_pub   = node.create_publisher(Twist,           '/pwb/cmd_vel', 10)
     lift_pub  = node.create_publisher(UInt16,          '/pwb/lift_target_height', 10)
     servo_pub = node.create_publisher(UInt8MultiArray, '/pwb/servos_target_angles', 10)
 

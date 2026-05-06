@@ -6,6 +6,8 @@ Panels:
       Expanded:
         - /Grid1/Offset1
         - /TF1/Frames1
+        - /Path1
+        - /Global map1/Topic1
       Splitter Ratio: 0.6839237213134766
     Tree Height: 565
   - Class: rviz_common/Selection
@@ -127,7 +129,7 @@ Visualization Manager:
           Scale: 1
           Value: true
         Value: false
-      Enabled: true
+      Enabled: false
       Keep: 10
       Name: Odometry
       Position Tolerance: 0.10000000149011612
@@ -148,7 +150,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /pwb/odom
-      Value: true
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz_default_plugins/Path
@@ -183,8 +185,8 @@ Visualization Manager:
       Class: rviz_default_plugins/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: false
-      Name: Loval map
+      Enabled: true
+      Name: Local map
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -199,18 +201,18 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /local_costmap/costmap_updates
       Use Timestamp: false
-      Value: false
+      Value: true
     - Alpha: 0.699999988079071
       Binary representation: false
       Binary threshold: 100
       Class: rviz_default_plugins/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: false
+      Enabled: true
       Name: Global map
       Topic:
         Depth: 5
-        Durability Policy: Volatile
+        Durability Policy: Transient Local
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
@@ -222,7 +224,30 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /global_costmap/costmap_updates
       Use Timestamp: false
-      Value: false
+      Value: true
+    - Alpha: 0.699999988079071
+      Binary representation: false
+      Binary threshold: 100
+      Class: rviz_default_plugins/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: true
+      Name: Map
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /map
+      Update Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /map_updates
+      Use Timestamp: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -269,25 +294,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 7.038507461547852
+      Distance: 4.749414443969727
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.18704333901405334
-        Y: -0.6859148144721985
-        Z: -0.3039362132549286
+        X: -0.5711489319801331
+        Y: -0.13045835494995117
+        Z: -0.7279404401779175
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.3597965240478516
+      Pitch: 1.4897964000701904
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.0904407501220703
+      Yaw: 1.6704342365264893
     Saved: ~
 Window Geometry:
   Displays:

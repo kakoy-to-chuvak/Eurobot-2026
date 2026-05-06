@@ -1,14 +1,12 @@
 # esp32_bridge
+
 ROS2 мост для ESP32 робота. Обеспечивает связь между ROS2 и прошивкой ESP32 через TCP сокеты.
+
 
 ## Запуск
 
 ```bash
-# Базовый запуск
 ros2 run your_package esp32_bridge.py
-
-# С указанием параметров
-ros2 run your_package esp32_bridge.py --ros-args -p host:=192.168.1.100 -p port:=8080 -p lidar_port:=8090
 ```
 
 ## Параметры
@@ -18,22 +16,23 @@ ros2 run your_package esp32_bridge.py --ros-args -p host:=192.168.1.100 -p port:
 | `host` | string | 127.0.0.1 | IP адрес ESP32 |
 | `port` | int | 8080 | Порт для управления роботом |
 | `lidar_port` | int | 8090 | Порт для данных лидара |
+| `ping_frequency` | int | 10 | Частота пинга ESP32 для проверки соединения (Гц) |
 | `odom_frame` | string | pwb_odom | Имя фрейма одометрии |
 | `base_frame` | string | base_link | Имя базового фрейма робота |
 | `lidar_frame` | string | lidar | Имя фрейма лидара |
 | `lift_frame` | string | lift | Имя фрейма подъёмника |
 | `servo_frames` | string[] | [servo0, servo1, servo2, servo3] | Имена фреймов сервоприводов |
-| `lidar_xyz` | float[] | [0.0, 0.0, 0.40] | Позиция лидара относительно base_link (м) |
-| `lidar_rpy_deg` | float[] | [0.0, 0.0, 0.0] | Ориентация лидара (градусы, roll/pitch/yaw) |
+| `lidar_xyz` | float[] | [0.0, 0.0, 0.40] | Позиция лидара относительно `base_link` (м) |
 | `lidar_shift_deg` | float | -15.0 | Сдвиг углов скана лидара (градусы) |
 | `lidar_mirror` | bool | True | Зеркальное отображение скана |
 | `lidar_range_min` | float | 0.05 | Минимальная дальность лидара (м) |
 | `lidar_range_max` | float | 4.0 | Максимальная дальность лидара (м) |
-| `lift_xyz` | float[] | [0.05, 0.0, 0.0] | Позиция подъёмника относительно base_link (м) |
+| `lift_xyz` | float[] | [0.05, 0.0, 0.0] | Позиция подъёмника относительно `base_link` (м) |
 | `servo0_pos` | float[] | [0.01, -0.075, 0.0] | Позиция серво 0 (м) |
 | `servo1_pos` | float[] | [0.01, -0.025, 0.0] | Позиция серво 1 (м) |
 | `servo2_pos` | float[] | [0.01, 0.025, 0.0] | Позиция серво 2 (м) |
 | `servo3_pos` | float[] | [0.01, 0.075, 0.0] | Позиция серво 3 (м) |
+| `use_lift_tf` | bool | False | Публиковать динамический TF для подъёмника и сервоприводов |
 
 ## Публикуемые топики
 
@@ -56,33 +55,30 @@ ros2 run your_package esp32_bridge.py --ros-args -p host:=192.168.1.100 -p port:
 
 | from | to | тип | Описание |
 |------|-----|-----|----------|
-| map | pwb_odom | static | Фиксированная трансформация |
-| pwb_odom | base_link | dynamic | Одометрия |
-| base_link | lidar | static | Монтаж лидара |
-| base_link | lift | dynamic | Позиция подъёмника |
-| lift | servoN | dynamic | Позиция сервопривода (с учётом угла) |
+| map | pwb_odom | static | Фиксированная трансформация (обнуляет `map`) |
+| pwb_odom | base_link | dynamic | Одометрия робота |
+| base_link | lidar | dynamic | Публикуется с каждым лидарным кадром для компенсации ошибок одометрии |
+| base_link | lift | dynamic | Позиция подъёмника (если `use_lift_tf:=True`) |
+| lift | servoN | dynamic | Позиция сервопривода с учётом угла (если `use_lift_tf:=True`) |
 
 ## Особенности
 
+### Тип команды скорости
+Узел подписан на топик `/pwb/cmd_vel` типа `geometry_msgs/Twist`. Nav2 по умолчанию публикует именно этот тип. Если ваш драйвер ожидает `TwistStamped`, используйте адаптер:
+```bash
+ros2 run topic_tools relay cmd_vel /pwb/cmd_vel
+```
+
 ### Автоматическое переподключение
-При обрыве связи с ESP32 нода автоматически пытается восстановить соединение каждые 5 секунд.
+При обрыве связи с ESP32 нода автоматически пытается восстановить соединение.
 
-### Graceful Shutdown
-При завершении работы (Ctrl+C) нода корректно закрывает сокеты и останавливает робота.
-
-### Поддержка лидара
-- Автоматическое переподключение к серверу лидара
-- Проверка CRC пакетов
-- Конвертация углов и дистанций в LaserScan
-
-
-## Требования
-
-- ROS2
-- Python 3.8+
-- Пакеты: `rclpy`, `std_msgs`, `geometry_msgs`, `sensor_msgs`, `nav_msgs`, `tf2_ros`
+### Лидар
+- Поддержка сырых пакетов лидара с ESP32
+- Проверка целостности данных (CRC16)
+- Автоматическое переподключение к серверу лидара на ESP32
+- Публикация TF `base_link -> lidar` динамически, вместе со сканом
 
 ## Файлы
 
-- `esp32_bridge.py` - главный узел
-- `EspClientApi.py` - API для связи с ESP32 и лидаром
+- `esp32_bridge.py` — главный узел
+- `EspClientApi.py` — API для TCP-связи с ESP32 (робот и лидар)
