@@ -19,6 +19,7 @@ static uint8_t *wr = scanBuf;
 static uint8_t frameCount = 0;
 static float prevStartAngle = -1;
 
+extern float theta, xPos, yPos;
 
 
 
@@ -167,8 +168,17 @@ void LidarTask(void *_Param) {
         frameCount++;
 
         if (frameCount >= MAX_FRAMES) {
-            LogTrace("Sending lidar");
-            SendLidarPacket(scanBuf, scanSize + 2, theta, xPos, yPos);
+            size_t scanSize = frameCount * FRAME_LEN;
+            uint16_t crc = 0xFFFF;
+            for (size_t i = 0; i < scanSize; ++i) {
+                crc = crc16(crc, scanBuf[i]);
+            }
+            scanBuf[scanSize] = crc & 0xFF;
+            scanBuf[scanSize + 1] = crc >> 8;
+            if ( lidar_client.connected() ) {
+                LogTrace("Sending lidar");
+                SendLidarPacket(scanBuf, scanSize + 2, theta, xPos, yPos);
+            }
             frameCount = 0;
             wr = scanBuf;
             prevStartAngle = -1;    // сброс для корректного «перескока» угла

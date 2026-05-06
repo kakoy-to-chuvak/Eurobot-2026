@@ -29,7 +29,7 @@ void ComputeOdometry() {
     yPos += delta_s * sin(theta + delta_theta / 2.0);
     theta += delta_theta;
 
-    LogTrace2("Compute odometry | x: %f | y: %f | theta: %f | delta_l: %i | delta_r: %i", xPos, yPos, theta, delta_l, delta_r);
+    LogTrace2("Compute odometry | x: %f | y: %f | theta: %f | delta_l: %f | delta_r: %f", xPos, yPos, theta, delta_l, delta_r);
 
     prev_current_l = current_l;
     prev_current_r = current_r;

@@ -73,9 +73,9 @@ const unsigned long DELAY_PER_SERVO[4] = { 20, 20, 20, 20 };
 #define LOG_LEVEL 0
 
 #if LOG_LEVEL <= 2
-#   define LodError(fmt, ...) Serial.printf("[ERROR] " fmt "\n", ##__VA_ARGS__)
+#   define LogError(fmt, ...) Serial.printf("[ERROR] " fmt "\n", ##__VA_ARGS__)
 #else
-#   define LodError(fmt, ...) 
+#   define LogError(fmt, ...) 
 #endif
 
 #if LOG_LEVEL <= 1

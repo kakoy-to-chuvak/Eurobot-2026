@@ -55,7 +55,7 @@ class AsyncSocket:
         self.max_pkg_size = max_pkg_size
 
         if supported_messages is None:
-            supported_messages = {}
+            self.supported_messages = {}
         else:
             self.supported_messages = supported_messages
 

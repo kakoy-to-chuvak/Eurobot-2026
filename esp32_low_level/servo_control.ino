@@ -23,10 +23,6 @@ inline void SetupServo() {
     LogDebug("Setup servo");    
 
     for (int i = 0; i < 4; i++) {
-        ESP32PWM::allocateTimer(0);
-        ESP32PWM::allocateTimer(1);
-        ESP32PWM::allocateTimer(3);
-        ESP32PWM::allocateTimer(4);
         servos[i].attach(SERVO_PINS[i], 500, 2500);
         servos[i].write(servosLimits[i][1]);
     }

@@ -81,6 +81,11 @@ void HandleAPIServer() {
     }
 
     uint8_t buffer[64];
+    if ( data_size > sizeof(buffer) ) {
+        LogWarn("Too large pkg. Dropping.");
+        data_size = 0;
+        return;
+    }
 
     socket_client.read(buffer, data_size);
     LogTrace("Read data");
