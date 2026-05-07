@@ -3,9 +3,9 @@
 Launch-пакет для запуска навигации Nav2 с предварительной загрузкой карты.
 
 ## Запуск
-
+```bash
 ros2 launch my_nav_launch navigation.launch.py
-
+```
 ## Что делает launch-файл
 
 1. Запускает map_server с картой из папки map/

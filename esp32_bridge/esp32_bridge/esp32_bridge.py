@@ -44,10 +44,10 @@ def rpy_to_quat(roll: float, pitch: float, yaw: float) -> Quaternion:
     cp, sp = math.cos(pitch / 2), math.sin(pitch / 2)
     cr, sr = math.cos(roll / 2), math.sin(roll / 2)
     q = Quaternion()
-    q.w = cr * cp * cy + sr * sp * sy
     q.x = sr * cp * cy - cr * sp * sy
     q.y = cr * sp * cy + sr * cp * sy
     q.z = cr * cp * sy - sr * sp * cy
+    q.w = cr * cp * cy + sr * sp * sy
     return q
 
 
@@ -94,6 +94,7 @@ class Parameters:
 
         # Другие параметры
         self.use_lift_tf = self.create_parameter("use_lift_tf", False)
+        self.tf_publish_frequency =self.create_parameter("tf_publish_frequency", 10.0)
     
     def create_parameter(self, name: str, value):
         self.__node__.declare_parameter(name, value)
@@ -119,6 +120,9 @@ class Esp32_Bridge(Node):
         if self.parameters.ping_frequency != 0:
             self.ping_timer    = self.create_timer(1 / self.parameters.ping_frequency, self.ping_esp)
             self.receive_timer = self.create_timer(0.02, self.receive_esp_data)
+
+        if self.parameters.tf_publish_frequency != 0:
+            self.tf_timer = self.create_timer(1 / self.parameters.tf_publish_frequency, self.publish_dynamic_tf)
         
         # Ping stats
         self.sended_msgs = 0
@@ -177,55 +181,41 @@ class Esp32_Bridge(Node):
         
         self.static_br.sendTransform(tf)
         self.get_logger().debug("Published static TF map → odom")
-        
-     
-     
-    def receive_motors_speed(self, msg: Twist):
-        if self.start:
-            self.esp_client.set_motors_speed(msg.linear.x, msg.angular.z)
-        
-    def receive_lift_height(self, msg: UInt16):            
-        self.esp_client.set_lift_height(msg.data)
-        
-    def receive_servo_state(self, msg: UInt8MultiArray):
-        self.esp_client.set_servo_state(msg.data)        
-        
-    def publish_odometry(self):
+    
+    def publish_dynamic_tf(self):
         time_stamp = self.get_clock().now().to_msg()
-        
-        # Publishing odometry
-        odom = Odometry()
-        odom.header.stamp    = time_stamp
-        odom.header.frame_id = self.parameters.odom_frame
-        odom.child_frame_id  = self.parameters.base_frame
-        odom.pose.pose.position.x  = float(self.xPos)
-        odom.pose.pose.position.y  = float(self.yPos)
-        odom.pose.pose.orientation = q_yaw(self.theta)
-        odom.twist.twist.linear.x  = float(self.linear_x)
-        odom.twist.twist.angular.z = float(self.angular_z)
-        
-        self.odom_publisher.publish(odom)
-        
-        # Publishing odometry tf
+
+        # odometry tf
         tf = TransformStamped()
         tf.header.stamp    = time_stamp
+
         tf.header.frame_id = self.parameters.odom_frame
         tf.child_frame_id  = self.parameters.base_frame
         tf.transform.translation.x = float(self.xPos)
         tf.transform.translation.y = float(self.yPos)
-        tf.transform.rotation = odom.pose.pose.orientation
-        
+        tf.transform.rotation = q_yaw(self.theta)
         self.tf_br.sendTransform(tf)
 
-    def publish_servo(self):
-        servo = UInt8MultiArray()
-        servo.data = list(self.servo_state)
-        
-        self.servo_pos_pub.publish(servo)
+        # lidar tf
+        xyz = self.parameters.lidar_xyz
+        tf.header.frame_id = self.parameters.odom_frame
+        tf.child_frame_id = self.parameters.lidar_frame
+        tf.transform.translation.x = float(xyz[0] * math.cos(self.lidar_theta) - xyz[1] * math.sin(self.lidar_theta) + self.lidar_x)
+        tf.transform.translation.y = float(xyz[0] * math.sin(self.lidar_theta) + xyz[1] * math.cos(self.lidar_theta) + self.lidar_y)
+        tf.transform.translation.z = float(xyz[2])
+        tf.transform.rotation = q_yaw(self.parameters.lidar_shift_deg + self.lidar_theta)
+        self.tf_br.sendTransform(tf)
 
         if self.parameters.use_lift_tf:
-            tf = TransformStamped()
-            tf.header.stamp = self.get_clock().now().to_msg()
+            # lift tf
+            tf.header.frame_id = self.parameters.base_frame
+            tf.child_frame_id = self.parameters.lift_frame
+            tf.transform.translation.x = float(self.parameters.base_lift_xyz[0])
+            tf.transform.translation.y = float(self.parameters.base_lift_xyz[1])
+            tf.transform.translation.z = float(self.parameters.base_lift_xyz[2] + self.lift_height / 1000)
+            self.tf_br.sendTransform(tf)
+
+            # servo tfs
             tf.header.frame_id = self.parameters.lift_frame
         
             for frame, pos, ang in zip(self.parameters.servo_frames, self.parameters.servos_pos, self.servo_state):
@@ -235,25 +225,42 @@ class Esp32_Bridge(Node):
                 tf.transform.translation.z = float(pos[2])
                 tf.transform.rotation = rpy_to_quat(0, -ang / 180 * math.pi, 0)
                 self.tf_br.sendTransform(tf)
+     
+     
+    def receive_motors_speed(self, msg: Twist):
+        self.linear_x = msg.linear.x
+        self.angular_z = msg.angular.z
+        
+        if self.start:
+            self.esp_client.set_motors_speed(msg.linear.x, msg.angular.z)
+        
+    def receive_lift_height(self, msg: UInt16):            
+        self.esp_client.set_lift_height(msg.data)
+        
+    def receive_servo_state(self, msg: UInt8MultiArray):
+        self.esp_client.set_servo_state(msg.data)        
+        
+    def publish_odometry(self):       
+        odom = Odometry()
+        odom.header.stamp    = self.get_clock().now().to_msg()
+        odom.header.frame_id = self.parameters.odom_frame
+        odom.child_frame_id  = self.parameters.base_frame
+        odom.pose.pose.position.x  = float(self.xPos)
+        odom.pose.pose.position.y  = float(self.yPos)
+        odom.pose.pose.orientation = q_yaw(self.theta)
+        odom.twist.twist.linear.x  = float(self.linear_x)
+        odom.twist.twist.angular.z = float(self.angular_z)
+        self.odom_publisher.publish(odom)
+
+    def publish_servo(self):
+        servo = UInt8MultiArray()
+        servo.data = list(self.servo_state)
+        self.servo_pos_pub.publish(servo)            
         
     def publish_lift_h(self):
         lift = UInt16()
         lift.data = int(self.lift_height)
-        
-        self.lift_h_pub.publish(lift)
-
-        if self.parameters.use_lift_tf:
-            tf = TransformStamped()
-            tf.header.stamp = self.get_clock().now().to_msg()
-            tf.header.frame_id = self.parameters.base_frame
-            tf.child_frame_id = self.parameters.lift_frame
-            tf.transform.translation.x = float(self.parameters.base_lift_xyz[0])
-            tf.transform.translation.y = float(self.parameters.base_lift_xyz[1])
-            tf.transform.translation.z = float(self.parameters.base_lift_xyz[2] + self.lift_height / 1000)
-            tf.transform.rotation = q_yaw(0)
-
-            self.tf_br.sendTransform(tf)
-        
+        self.lift_h_pub.publish(lift)       
     
     def ping_esp(self):
         if not self.esp_connected:
@@ -276,21 +283,7 @@ class Esp32_Bridge(Node):
             self.get_logger().error("Esp disconnected")
 
         self.esp_client.get_all()
-        self.last_esp_ping = time.perf_counter()
-
-    
-    def publish_lidar_tf(self):
-        xyz = self.parameters.lidar_xyz
-
-        tf = TransformStamped()
-        tf.header.stamp = self.get_clock().now().to_msg()
-        tf.header.frame_id = self.parameters.odom_frame
-        tf.child_frame_id = self.parameters.lidar_frame
-        tf.transform.translation.x = float(xyz[0] * math.cos(self.lidar_theta) - xyz[1] * math.sin(self.lidar_theta) + self.lidar_x)
-        tf.transform.translation.y = float(xyz[0] * math.sin(self.lidar_theta) + xyz[1] * math.cos(self.lidar_theta) + self.lidar_y)
-        tf.transform.translation.z = float(xyz[2])
-        tf.transform.rotation = rpy_to_quat(0.0, 0.0, self.parameters.lidar_shift_deg + self.lidar_theta)
-        self.tf_br.sendTransform(tf)
+        self.last_esp_ping = time.perf_counter()        
 
     def publish_lidar(self, angles: list, ranges: list, intens: list):        
         if len(angles) < 10 or len(ranges) < 10 or len(intens) < 10:
@@ -319,8 +312,6 @@ class Esp32_Bridge(Node):
         scan.ranges = ranges
         scan.intensities = intens
         self.scan_pub.publish(scan)
-        
-        self.publish_lidar_tf()
         
     def receive_esp_data(self):
         msg = self.esp_client.receive_msg()
@@ -416,7 +407,7 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        print("Shutdown...")
 
     finally:
         node.esp_client.disconnect()
