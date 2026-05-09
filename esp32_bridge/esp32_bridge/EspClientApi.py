@@ -82,6 +82,9 @@ class AsyncSocket:
 
         self.sended_msgs = 0
         self.received_msgs = 0
+    
+    def get_message(self) -> bytes:
+        return self.message_queue.popleft()
 
     def create_msg(self, type: str, format: str, *args):
         if type not in self.supported_messages:
@@ -222,7 +225,7 @@ class EspClient(AsyncSocket):
         if self.socket is None or self.running == False or len(self.message_queue) <= 0:
             return None
         
-        bin_data = self.message_queue.popleft()
+        bin_data = self.get_message()
         if bin_data is None or len(bin_data) < 1:
             return None
 
@@ -401,7 +404,7 @@ class LidarClient(AsyncSocket):
         if self.socket is None or self.running == False or len(self.message_queue) <= 0:
             return None
 
-        bin_data = self.message_queue.popleft()
+        bin_data = self.get_message()
         if bin_data is None or len(bin_data) < 1:
             return None
 

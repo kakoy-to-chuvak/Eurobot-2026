@@ -27,9 +27,9 @@ class RobotState:
 
     def __init__(self):
         # Одометрия
-        self.x = 0.0
-        self.y = 0.0
-        self.theta = 0.0
+        self.x = 1.2
+        self.y = 0.75
+        self.theta = math.pi * 3 / 2
         self.linear_speed = 0.0
         self.angular_speed = 0.0
         self._last_odom_time = 0.0
@@ -128,6 +128,12 @@ class LidarServer:
             [[-1.5, 1.0 - beacon_size], [-1.5 - beacon_size, 1.0 - beacon_size]],
             [[-1.5 - beacon_size, 1.0 - beacon_size], [-1.5 - beacon_size, 1.0]],
             [[-1.5 - beacon_size, 1.0], [-1.5, 1.0]],
+
+            # test lines
+            [[0.0, 0.0], [0.0, beacon_size]],
+            [[0.0, beacon_size], [beacon_size, beacon_size]],
+            [[beacon_size, beacon_size], [beacon_size, 0.0]],
+            [[beacon_size, 0.0], [0.0, 0.0]],
         ]
 
         self._noisy_lines = self._static_lines[:]
