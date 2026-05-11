@@ -15,7 +15,7 @@ from rclpy.node import Node
 
 # Messages
 from std_msgs.msg import UInt8MultiArray, UInt16
-from geometry_msgs.msg import Twist, Quaternion
+from geometry_msgs.msg import Twist, Quaternion, PoseWithCovarianceStamped
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 
@@ -57,6 +57,7 @@ class Parameters:
 
         # Параметры сокетов
         self.host = self.create_parameter("host", "127.0.0.1")
+        print(self.host)
         self.port = self.create_parameter("port", 8080)
         self.lidar_port = self.create_parameter("lidar_port", 8090)
 
@@ -87,7 +88,7 @@ class Parameters:
 
         
         # Параметры лидара
-        self.lidar_shift_deg = self.create_parameter("lidar_shift_deg", -15.0) # сдвиг облака CW
+        self.lidar_shift_deg = math.radians(self.create_parameter("lidar_shift_deg", -15.0)) # сдвиг облака CW
         self.lidar_mirror    = self.create_parameter("lidar_mirror", True)     # зеркально (True/False)
         self.lidar_range_min = self.create_parameter("lidar_range_min", 0.05)
         self.lidar_range_max = self.create_parameter("lidar_range_max", 4.0)
@@ -105,7 +106,7 @@ class Esp32_Bridge(Node):
     def __init__(self):
         super().__init__('esp32_bridge')
         
-        self.parameters = Parameters(self)
+        self.parameters = Parameters(self)  
         
         # Объекты клиентов для подключения
         self.esp_client = EspClientApi.EspClient(self.parameters.host, self.parameters.port, logger=self.get_logger())
@@ -158,7 +159,7 @@ class Esp32_Bridge(Node):
         self.cmd_vel_sub = self.create_subscription(Twist, '/pwb/cmd_vel', self.receive_motors_speed, 10)
         self.lift_h_sub = self.create_subscription(UInt16, '/pwb/lift_target_height', self.receive_lift_height, 10)
         self.servo_pos_sub = self.create_subscription(UInt8MultiArray, '/pwb/servos_target_angles', self.receive_servo_state, 10)
-        
+        self.pose_sub = self.create_subscription(PoseWithCovarianceStamped, "/initialpose", self.receive_pose, 10)
         
         # TF
         self.tf_br = TransformBroadcaster(self)
@@ -166,6 +167,13 @@ class Esp32_Bridge(Node):
         self._publish_static_tf()
         self.publish_odometry()
         
+    def receive_pose(self, pose: PoseWithCovarianceStamped):
+        self.xPos = pose.pose.pose.position.x
+        self.yPos = pose.pose.pose.position.y
+        self.theta = 2 * math.acos(pose.pose.pose.orientation.w)
+        if pose.pose.pose.orientation.z < 0:
+            self.theta = 2 * math.pi - self.theta
+        self.esp_client.set_odometry(self.xPos, self.yPos, self.theta)
         
     def _publish_static_tf(self):
         # Publishing odom frame

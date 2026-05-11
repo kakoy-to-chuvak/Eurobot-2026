@@ -1,6 +1,6 @@
 bt_navigator:
   ros__parameters:
-    replan_interval_seconds: 1.0
+    enable_replanning: true
     replan_interval_seconds: 1.0
     global_frame: map
     robot_base_frame: base_link
@@ -48,36 +48,47 @@ controller_server:
     # Regulated Pure Pursuit Controller
     controller_plugins: ["FollowPath"]
     FollowPath:
-      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      
-      # --- Скорости ---
-      desired_linear_vel: 0.3
-      max_linear_vel: 0.35
-      min_linear_vel: 0.0
-      max_linear_accel: 1.5
-
-      max_angular_vel: 0.8
-      min_angular_vel: -0.8
-      max_angular_accel: 1.2
-
-      # --- Поворот на месте ---
-      use_rotate_to_heading: true
-      rotate_to_heading_angular_vel: 0.8
-      rotate_to_heading_min_angle: 0.3
-
-      # --- Lookahead ---
-      lookahead_dist: 0.1
-      use_velocity_scaled_lookahead_dist: true
-
-      # --- Коллизии и регулировка ---
-      use_regulated_linear_velocity_scaling: true
-      use_cost_regulated_linear_velocity_scaling: true
-      approach_velocity_scaling_dist: 0.3
-      cost_scaling_dist: 0.3
-      allow_obstacle_checking_beyond_goal: true
-
-      # --- Трансформации ---
-      transform_tolerance: 0.3      
+      plugin: "dwb_core::DWBLocalPlanner"
+      debug_trajectory_details: True
+      min_vel_x: 0.0
+      min_vel_y: 0.0
+      max_vel_x: 0.2
+      max_vel_y: 0.0
+      max_vel_theta: 1.5
+      min_vel_theta: -1.5
+      min_speed_xy: 0.0
+      max_speed_xy: 0.2
+      min_speed_theta: 0.0
+      acc_lim_x: 0.5
+      acc_lim_y: 0.0
+      acc_lim_theta: 1.8
+      decel_lim_x: -1.0
+      decel_lim_y: 0.0
+      decel_lim_theta: -3.2
+      vx_samples: 20
+      vy_samples: 5
+      vtheta_samples: 20
+      sim_time: 1.7
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      transform_tolerance: 0.2
+      xy_goal_tolerance: 0.02
+      yaw_goal_tolerance: 0.05
+      trans_stopped_velocity: 0.25
+      short_circuit_trajectory_evaluation: True
+      stateful: True
+      critics: ["RotateToGoal", "Oscillation", "GoalAlign", "PathAlign", "PathDist", "GoalDist", "ObstacleFootprint"]
+      PathAlign.scale: 32.0
+      PathAlign.forward_point_distance: 0.05
+      GoalAlign.scale: 0.01
+      GoalAlign.forward_point_distance: 0.05
+      PathDist.scale: 256.0
+      GoalDist.scale: 32.0
+      RotateToGoal.scale: 1.5
+      RotateToGoal.slowing_factor: 5.0
+      RotateToGoal.lookahead_time: 1.0
+      ObstacleFootprint:
+        scale: 256.0
 
 local_costmap:
   local_costmap:
@@ -95,7 +106,7 @@ local_costmap:
       plugins: ["voxel_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 0.0
+        cost_scaling_factor: 1.0
         inflation_radius: 0.4
         inflation_cost_scaling_factor: 4.0
       voxel_layer:
@@ -123,81 +134,62 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 4.0
-      publish_frequency: 4.0
+      update_frequency: 1.0
+      publish_frequency: 3.0
       global_frame: map
       robot_base_frame: base_link
+      footprint: "[[0.06, 0.11], [0.06, -0.11], [-0.06, -0.11], [-0.06, 0.11]]"
+      footprint_padding: 0.01
       resolution: 0.05
       track_unknown_space: false
-
-      # Список плагинов глобальной карты: два контейнера
-      plugins: [
-        "plugin_container_static_layer",
-        "plugin_container_obstacle_layer"
-      ]
-
-      plugin_container_static_layer:
-        plugin: "nav2_costmap_2d::PluginContainerLayer"
+      width: 10
+      height: 10
+      origin_x: -5.0
+      origin_y: -5.0
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
-        combination_method: 1
-        plugins: ["static_layer", "inflation_layer_static"]
-        static_layer:
-          plugin: "nav2_costmap_2d::StaticLayer"
-          map_subscribe_transient_local: True
-          map_topic: "/map"
-          enabled: True
-        inflation_layer_static:
-          plugin: "nav2_costmap_2d::InflationLayer"
-          inflation_radius: 0.2
-          cost_scaling_factor: 1.5
-
-      plugin_container_obstacle_layer:
-        plugin: "nav2_costmap_2d::PluginContainerLayer"
+        observation_sources: scan
+        scan:
+          topic: /pwb/lidar_scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.1
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.1
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.2
+        inflation_cost_scaling_factor: 4.0
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+        map_topic: "/map"  
         enabled: True
-        combination_method: 1
-        plugins: ["obstacle_layer", "inflation_layer_obstacle"]
-        obstacle_layer:
-          plugin: "nav2_costmap_2d::ObstacleLayer"
-          enabled: True
-          observation_sources: scan
-          scan:
-            topic: /pwb/lidar_scan
-            max_obstacle_height: 2.0
-            clearing: True
-            marking: True
-            data_type: "LaserScan"
-            raytrace_max_range: 3.0
-            raytrace_min_range: 0.0
-            obstacle_max_range: 2.5
-            obstacle_min_range: 0.0
-        inflation_layer_obstacle:
-          plugin: "nav2_costmap_2d::InflationLayer"
-          inflation_radius: 0.4
-          cost_scaling_factor: 0.0
+      always_send_full_costmap: True
 
 planner_server:
   ros__parameters:
     expected_planner_frequency: 10.0
     planner_plugins: ["GridBased"]
+    costmap_update_timeout: 2.0
     GridBased:
-      plugin: "nav2_smac_planner::SmacPlanner2D"
-      tolerance: 0.0
-      allow_unknown: false
-      downsample_costmap: false
-      downsampling_factor: 1
-      allow_primitive_planning: true
-      cost_travel_multiplier: 200.0
-      smooth_path: true
+      plugin: "nav2_navfn_planner::NavfnPlanner"
+      tolerance: 0.5
       use_astar: true
-      use_network: false
-      checkpoint_angle: 0.0
+      allow_unknown: false
 
 smoother_server:
   ros__parameters:
     smoother_plugins: ["simple_smoother"]
     simple_smoother:
       plugin: "nav2_smoother::SimpleSmoother"
-      tolerance: 0.00001
+      tolerance: 1.0e-10
       max_its: 1000
       do_refinement: True
 
@@ -266,23 +258,16 @@ collision_monitor:
     source_timeout: 1.0
     base_shift_correction: True
     stop_pub_timeout: 2.0
-
-    polygons: ["slow_zone", "stop_zone"]
-    
-    slow_zone:
-      type: "circle"
-      action_type: "slowdown"
-      radius: 0.6
-      slowdown_ratio: 0.5
-      min_points: 1
-    
-    stop_zone:
-      type: "circle"
-      action_type: "stop"
-      radius: 0.3
-      min_points: 1
-      enabled: true
-
+    polygons: ["FootprintApproach"]
+    FootprintApproach:
+      type: "polygon"
+      action_type: "approach"
+      footprint_topic: "/local_costmap/published_footprint"
+      time_before_collision: 0.5
+      simulation_time_step: 0.1
+      min_points: 6
+      visualize: False
+      enabled: false
     observation_sources: ["scan"]
     scan:
       type: "scan"
