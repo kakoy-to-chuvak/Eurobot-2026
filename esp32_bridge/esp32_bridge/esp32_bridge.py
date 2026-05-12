@@ -14,7 +14,7 @@ import rclpy
 from rclpy.node import Node
 
 # Messages
-from std_msgs.msg import UInt8MultiArray, UInt16
+from std_msgs.msg import UInt8MultiArray, UInt16, String, Bool
 from geometry_msgs.msg import Twist, Quaternion, PoseWithCovarianceStamped
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
@@ -153,6 +153,8 @@ class Esp32_Bridge(Node):
         self.lift_h_pub = self.create_publisher(UInt16, '/pwb/lift_current_height', 10)
         self.servo_pos_pub = self.create_publisher(UInt8MultiArray, '/pwb/servos_current_angles', 10)
         self.scan_pub = self.create_publisher(LaserScan, "/pwb/lidar_scan", 10)
+        self.side_pub = self.create_publisher(String, "/pwb/side", 10)
+        self.start_pub = self.create_publisher(Bool, "/pwb/start", 10)
         
         
         # ROS subscriptions
@@ -366,10 +368,16 @@ class Esp32_Bridge(Node):
                     self.publish_lift_h()
                 case 'SEND_SIDE':
                     self.side = msg['side']
+                    side_msg = String()
+                    side_msg.data = self.side
+                    self.side_pub.publish(side_msg)
                     self.get_logger().info(f"Side: {self.side}")
                     
                 case 'SEND_START':
                     self.start = msg['start']
+                    start_msg = Bool()
+                    start_msg.data = self.start
+                    self.start_pub.publish(start_msg)
                     self.get_logger().info(f"Start: {self.start}")
                     if not self.start:
                         self.esp_client.set_motors_speed(0.0, 0.0)

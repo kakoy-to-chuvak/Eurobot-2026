@@ -2,7 +2,6 @@
 
 ROS2 мост для ESP32 робота. Обеспечивает связь между ROS2 и прошивкой ESP32 через TCP сокеты.
 
-
 ## Запуск
 
 ```bash
@@ -17,6 +16,7 @@ ros2 run your_package esp32_bridge.py
 | `port` | int | 8080 | Порт для управления роботом |
 | `lidar_port` | int | 8090 | Порт для данных лидара |
 | `ping_frequency` | int | 10 | Частота пинга ESP32 для проверки соединения (Гц) |
+| `tf_publish_frequency` | float | 10.0 | Частота публикации динамических TF (Гц) |
 | `odom_frame` | string | pwb_odom | Имя фрейма одометрии |
 | `base_frame` | string | base_link | Имя базового фрейма робота |
 | `lidar_frame` | string | lidar | Имя фрейма лидара |
@@ -42,6 +42,8 @@ ros2 run your_package esp32_bridge.py
 | `/pwb/lidar_scan` | sensor_msgs/LaserScan | Сканирование лидара |
 | `/pwb/lift_current_height` | std_msgs/UInt16 | Текущая высота подъёмника (мм) |
 | `/pwb/servos_current_angles` | std_msgs/UInt8MultiArray | Текущие углы сервоприводов (0-90°) |
+| `/pwb/side` | std_msgs/String | Сторона робота ("yellow" / "blue") |
+| `/pwb/start` | std_msgs/Bool | Статус старта робота |
 
 ## Подписываемые топики
 
@@ -50,6 +52,7 @@ ros2 run your_package esp32_bridge.py
 | `/pwb/cmd_vel` | geometry_msgs/Twist | Целевые скорости робота |
 | `/pwb/lift_target_height` | std_msgs/UInt16 | Целевая высота подъёмника (мм) |
 | `/pwb/servos_target_angles` | std_msgs/UInt8MultiArray | Целевые углы сервоприводов (0-90°) |
+| `/initialpose` | geometry_msgs/PoseWithCovarianceStamped | Начальная поза для сброса одометрии |
 
 ## Трансформации (TF)
 
@@ -57,17 +60,20 @@ ros2 run your_package esp32_bridge.py
 |------|-----|-----|----------|
 | map | pwb_odom | static | Фиксированная трансформация (обнуляет `map`) |
 | pwb_odom | base_link | dynamic | Одометрия робота |
-| base_link | lidar | dynamic | Публикуется с каждым лидарным кадром для компенсации ошибок одометрии |
+| base_link | lidar | dynamic | Публикуется с каждым лидарным кадром с учётом ошибок одометрии |
 | base_link | lift | dynamic | Позиция подъёмника (если `use_lift_tf:=True`) |
 | lift | servoN | dynamic | Позиция сервопривода с учётом угла (если `use_lift_tf:=True`) |
 
 ## Особенности
 
+### Состояние старта
+Робот начинает движение только после получения команды `SEND_START` от ESP32. При `start = False` команды скорости игнорируются.
+
+### Сброс одометрии
+Подписка на топик `/initialpose` позволяет установить одометрию робота в произвольное положение. Значение отправляется на ESP32 через `SET_ODOMETRY`.
+
 ### Тип команды скорости
-Узел подписан на топик `/pwb/cmd_vel` типа `geometry_msgs/Twist`. Nav2 по умолчанию публикует именно этот тип. Если ваш драйвер ожидает `TwistStamped`, используйте адаптер:
-```bash
-ros2 run topic_tools relay cmd_vel /pwb/cmd_vel
-```
+Узел подписан на топик `/pwb/cmd_vel` типа `geometry_msgs/Twist`. Nav2 по умолчанию публикует именно этот тип.
 
 ### Автоматическое переподключение
 При обрыве связи с ESP32 нода автоматически пытается восстановить соединение.
@@ -76,9 +82,10 @@ ros2 run topic_tools relay cmd_vel /pwb/cmd_vel
 - Поддержка сырых пакетов лидара с ESP32
 - Проверка целостности данных (CRC16)
 - Автоматическое переподключение к серверу лидара на ESP32
-- Публикация TF `base_link -> lidar` динамически, вместе со сканом
+- При получении скана обновляется TF `base_link → lidar` с учётом позиции робота в момент сканирования
+- Коррекция углов: нормализация в диапазон [-π, π], поддержка зеркального отображения
 
 ## Файлы
 
-- `esp32_bridge.py` — главный узел
+- `esp32_bridge.py` — главный ROS2 узел
 - `EspClientApi.py` — API для TCP-связи с ESP32 (робот и лидар)

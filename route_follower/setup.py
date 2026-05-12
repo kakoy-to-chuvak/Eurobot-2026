@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'path_follower'
+package_name = 'route_follower'
 
 setup(
     name=package_name,
@@ -13,18 +13,16 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Daniil',
-    maintainer_email='kakoy-to-chuvak@yandex.ru',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    maintainer='kto-to',
+    maintainer_email='',
+    description='',
+    license='',
     extras_require={
-        'test': [
-            'pytest',
-        ],
+        'test': [],
     },
     entry_points={
         'console_scripts': [
-            "path_follower = path_follower.path_follower:main"
+            "route_follower = route_follower.route_follower:main"
         ],
     },
 )

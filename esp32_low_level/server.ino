@@ -33,7 +33,8 @@ int data_size;
 uint32_t sended_messages = 0;
 uint32_t received_messages = 0;
 
-
+// Переменные с других файлов
+extern float wheel_speed_linear, wheel_speed_angular, xPos, yPos, theta;
 
 
 

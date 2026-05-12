@@ -43,6 +43,10 @@
 #define WHEEL_STEPS_PER_REV 800
 constexpr float WHEEL_STEPS_PER_M = (float)WHEEL_STEPS_PER_REV / ( 2.0f * M_PI * WHEEL_R );
 
+// Столкновения
+#define MIN_COLLIDE_DIST 500 // mm
+#define COLLIDE_CHECK_ANGLE 150.0 // deg
+
 // Lift
 #define LIFT_MIN_POSITION 0    // mm
 #define LIFT_MAX_POSITION 190  // mm

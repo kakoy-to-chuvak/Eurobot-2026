@@ -1,5 +1,8 @@
 __pycache__/*
 esp32_bridge/esp32_bridge/__pycache__/*
 lidar_odometry/lidar_odometry/__pycache__/*
+my_teleop/my_teleop/__pycache__/*
+route_executor/route_executor/__pycache__/*
+route_follower/route_follower/__pycache__/*
 esp32_low_level/build/*
 .vscode/*

@@ -10,13 +10,10 @@
 GStepper2<STEPPER2WIRE> stepper_l(WHEEL_STEPS_PER_REV, WHEEL_L_STP, WHEEL_L_DIR);    // left motor
 GStepper2<STEPPER2WIRE> stepper_r(WHEEL_STEPS_PER_REV, WHEEL_R_STP, WHEEL_R_DIR);    // right motor
 
-
-int32_t wheel_l_speed = 0;
-int32_t wheel_r_speed = 0;
-
-float wheel_speed_linear = 0;
-float wheel_speed_angular = 0;
-
+// Глобальные переменные скорости
+int32_t wheel_l_speed, wheel_r_speed;
+extern float wheel_speed_linear, wheel_speed_linear;
+extern bool global_collide;
 
 
 
@@ -73,6 +70,14 @@ void WheelsSetSpeed(float _Linear, float _Angular) {
 
 
 void WheelsTick() {
-    stepper_l.tick();
-    stepper_r.tick();
+    if ( !global_collide ) {
+        stepper_l.tick();
+        stepper_r.tick();
+    }
 }
+
+
+
+
+
+

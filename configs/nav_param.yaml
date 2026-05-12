@@ -50,16 +50,16 @@ controller_server:
     FollowPath:
       plugin: "dwb_core::DWBLocalPlanner"
       debug_trajectory_details: True
-      min_vel_x: 0.0
+      min_vel_x: -0.05
       min_vel_y: 0.0
-      max_vel_x: 0.2
+      max_vel_x: 0.15
       max_vel_y: 0.0
       max_vel_theta: 1.5
       min_vel_theta: -1.5
       min_speed_xy: 0.0
       max_speed_xy: 0.2
       min_speed_theta: 0.0
-      acc_lim_x: 0.5
+      acc_lim_x: 0.05
       acc_lim_y: 0.0
       acc_lim_theta: 1.8
       decel_lim_x: -1.0
@@ -77,18 +77,19 @@ controller_server:
       trans_stopped_velocity: 0.25
       short_circuit_trajectory_evaluation: True
       stateful: True
-      critics: ["RotateToGoal", "Oscillation", "GoalAlign", "PathAlign", "PathDist", "GoalDist", "ObstacleFootprint"]
+      critics: ["PreferForward", "RotateToGoal", "Oscillation", "PathAlign", "PathDist", "GoalDist", "ObstacleFootprint"]
+      PreferForward.scale: 2.0
+      Oscillation.scale: 1.0
       PathAlign.scale: 32.0
       PathAlign.forward_point_distance: 0.05
-      GoalAlign.scale: 0.01
-      GoalAlign.forward_point_distance: 0.05
       PathDist.scale: 256.0
-      GoalDist.scale: 32.0
-      RotateToGoal.scale: 1.5
+      GoalDist.scale: 8.0
+      RotateToGoal.scale: 0.0
       RotateToGoal.slowing_factor: 5.0
       RotateToGoal.lookahead_time: 1.0
-      ObstacleFootprint:
-        scale: 256.0
+      ObstacleFootprint.scale: 32.0
+
+
 
 local_costmap:
   local_costmap:
@@ -106,8 +107,8 @@ local_costmap:
       plugins: ["voxel_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 1.0
-        inflation_radius: 0.4
+        cost_scaling_factor: 5.0
+        inflation_radius: 0.3
         inflation_cost_scaling_factor: 4.0
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
@@ -146,43 +147,71 @@ global_costmap:
       height: 10
       origin_x: -5.0
       origin_y: -5.0
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
+            # Список плагинов глобальной карты: два контейнера
+      plugins: [
+        "plugin_container_static_layer",
+        "plugin_container_obstacle_layer"
+      ]
+
+      # Контейнер 1: Для статической карты (маленькая зона безопасности)
+      plugin_container_static_layer:
+        plugin: "nav2_costmap_2d::PluginContainerLayer"
         enabled: True
-        observation_sources: scan
-        scan:
-          topic: /pwb/lidar_scan
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-          raytrace_max_range: 3.0
-          raytrace_min_range: 0.1
-          obstacle_max_range: 2.5
-          obstacle_min_range: 0.1
-      inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.2
-        inflation_cost_scaling_factor: 4.0
-      static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: True
-        map_topic: "/map"  
+        combination_method: 1
+        plugins: ["static_layer", "inflation_layer_static"] # имя для плагина инфляции
+        static_layer:
+          plugin: "nav2_costmap_2d::StaticLayer"
+          map_subscribe_transient_local: True
+          map_topic: "/map"
+          enabled: True
+        inflation_layer_static: # Отдельный экземпляр слоя инфляции
+          plugin: "nav2_costmap_2d::InflationLayer"
+          inflation_radius: 0.2          # Маленький радиус для стен
+          cost_scaling_factor: 3.0      # Коэффициент снижения стоимости
+
+      # Контейнер 2: Для препятствий с лидара (большая зона безопасности)
+      plugin_container_obstacle_layer:
+        plugin: "nav2_costmap_2d::PluginContainerLayer"
         enabled: True
-      always_send_full_costmap: True
+        combination_method: 1
+        plugins: ["obstacle_layer", "inflation_layer_obstacle"] # имя для другого плагина
+        obstacle_layer:
+          plugin: "nav2_costmap_2d::ObstacleLayer"
+          enabled: True
+          observation_sources: scan
+          scan:
+            topic: /pwb/lidar_scan
+            max_obstacle_height: 2.0
+            clearing: True
+            marking: True
+            data_type: "LaserScan"
+            raytrace_max_range: 3.0
+            raytrace_min_range: 0.0
+            obstacle_max_range: 2.5
+            obstacle_min_range: 0.0
+        inflation_layer_obstacle: # Второй независимый экземпляр слоя инфляции
+          plugin: "nav2_costmap_2d::InflationLayer"
+          inflation_radius: 0.4          # БОЛЬШАЯ безопасная зона вокруг препятствий!
+          cost_scaling_factor: 0.5      # Более резкое снижение стоимости
+
 
 planner_server:
   ros__parameters:
     expected_planner_frequency: 10.0
     planner_plugins: ["GridBased"]
-    costmap_update_timeout: 2.0
     GridBased:
-      plugin: "nav2_navfn_planner::NavfnPlanner"
+      plugin: "nav2_smac_planner::SmacPlanner2D"  # или для старых версий: "nav2_smac_planner/SmacPlanner2D"
       tolerance: 0.5
-      use_astar: true
       allow_unknown: false
+      downsample_costmap: false
+      downsampling_factor: 1
+      allow_primitive_planning: false
+      cost_travel_multiplier: 10000.0
+      debug_planner: false
+      use_astar: true
+      smooth_path: true
+      use_network: false
+      checkpoint_angle: 0.0
 
 smoother_server:
   ros__parameters:

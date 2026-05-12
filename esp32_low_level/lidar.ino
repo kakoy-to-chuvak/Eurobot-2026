@@ -14,11 +14,17 @@ static const uint8_t HDR[4] = { 0x55, 0xAA, 0x03, 0x08 };
 #define FRAME_LEN 20     // длина упакованных данных на каждую порцию (2 байта нач.угол, 2 байта кон.угол, 8*2 байта дистанции)
 #define MAX_FRAMES 64    // макс. количество порций на один полный оборот (64*20 ≈ 1280 байт)
 
+// Считывание скана
 static uint8_t scanBuf[MAX_FRAMES * FRAME_LEN];
 static uint8_t *wr = scanBuf;
 static uint8_t frameCount = 0;
 static float prevStartAngle = -1;
 
+// Защита от столкновений
+bool scan_collide = false;
+extern bool global_collide;
+extern float wheel_speed_linear, wheel_speed_angular;
+// Переменные для отправки скана
 extern float theta, xPos, yPos;
 
 
@@ -140,10 +146,15 @@ void LidarTask(void *_Param) {
         uint8_t offset = 4;
         uint16_t dist[8];
         uint8_t quality[8];
+        bool packet_collide = false;
         for (int i = 0; i < 8; ++i) {
             dist[i] = body[offset] | (body[offset + 1] << 8);
             quality[i] = body[offset + 2];
             offset += 3;
+
+            if ( dist[i] < MIN_COLLIDE_DIST ) {
+                packet_collide = true;
+            }
         }
 
         float endDeg = decodeAngle(body[offset] | (body[offset + 1] << 8));
@@ -151,6 +162,17 @@ void LidarTask(void *_Param) {
         if (endDeg - startDeg > MAX_SPREAD_DEG) {
             // Пропускаем пакет, если слишком большой разрыв (ошибка)
             continue;
+        }
+
+        // Проверяем столкновения
+        if ( wheel_speed_linear > 0 ) {
+            if ( endDeg < COLLIDE_CHECK_ANGLE / 2 || startDeg > 360.0 - COLLIDE_CHECK_ANGLE / 2 ) {
+                scan_collide |= packet_collide;
+            }
+        } else if ( wheel_speed_linear < 0 ) {
+            if ( endDeg < 360.0 - COLLIDE_CHECK_ANGLE / 2 && startDeg > COLLIDE_CHECK_ANGLE / 2 ) {
+                scan_collide |= packet_collide;
+            }
         }
 
         // Упаковываем 20 байт в общий буфер скана
@@ -182,6 +204,10 @@ void LidarTask(void *_Param) {
             frameCount = 0;
             wr = scanBuf;
             prevStartAngle = -1;    // сброс для корректного «перескока» угла
+
+            global_collide = scan_collide;
+            scan_collide = 0;
+            LogDebug("Collide: %i", global_collide);
             continue;                         // переходим к следующему пакету
         }
 
@@ -205,6 +231,10 @@ void LidarTask(void *_Param) {
             // Сбрасываем буфер для следующего оборота
             wr = scanBuf;
             frameCount = 0;
+
+            global_collide = scan_collide;
+            scan_collide = 0;
+            LogDebug("Collide: %i", global_collide);
         }
         prevStartAngle = startDeg;
     }

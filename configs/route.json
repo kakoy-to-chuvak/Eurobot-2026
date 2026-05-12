@@ -1,0 +1,16 @@
+[
+    {
+        "move_lift": {
+            "wait": false,
+            "height": 200
+        },
+        "sleep": {
+            "sleep": 3.0
+        }
+    },
+    {
+        "move_lift": {
+            "height": 0
+        }
+    }
+]

@@ -13,8 +13,6 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
-        (os.path.join('share', package_name, 'nav_config'), glob('nav_config/*.yaml')),
-        (os.path.join('share', package_name, 'map'), glob('map/*.yaml') + glob('map/*.pgm')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
