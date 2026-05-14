@@ -1,16 +1,60 @@
 [
     {
-        "move_lift": {
-            "wait": false,
-            "height": 200
+        "nav_tgt": {
+            "x": 1.2,
+            "y": 0.3,
+            "theta": 1.57
         },
+        "move_lift": {
+            "height": 200,
+            "wait": false
+        },
+        "move_servo": {
+            "angles": [0.0, 0.0, 45, 20]
+        }
+    },
+    {
         "sleep": {
             "sleep": 3.0
+        },
+        "move_servo": {
+            "angles": [90, 90, 90, 90]
         }
     },
     {
         "move_lift": {
             "height": 0
+        }
+    },
+    {
+        "move_servo": {
+            "angles": [0, 0, 0, 0],
+            "wait": true
+        }
+    },
+    {
+        "nav_tgt": {
+            "x": 0.4,
+            "y": 0.5
+        },
+        "move_lift": {
+            "height": 200
+        }
+    },
+    {
+        "move_lift": {
+            "height": 0,
+            "wait": false
+        }
+    },
+    {
+        "nav_tgt": {
+            "x": 1.2,
+            "y": 0.8,
+            "theta": 0.0
+        },
+        "move_servo": {
+            "angles": [90, 90, 90, 90]
         }
     }
 ]

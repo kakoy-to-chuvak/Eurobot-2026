@@ -4,6 +4,7 @@ import signal
 
 from geometry_msgs.msg import Twist
 from std_msgs.msg import UInt8MultiArray, UInt16
+from rclpy.qos import qos_profile_parameters
 
 if sys.platform == 'win32':
     import msvcrt
@@ -131,8 +132,8 @@ def main(args=None):
     node = rclpy.create_node('my_teleop')
     
     vel_pub   = node.create_publisher(Twist,           '/pwb/cmd_vel', 10)
-    lift_pub  = node.create_publisher(UInt16,          '/pwb/lift_target_height', 10)
-    servo_pub = node.create_publisher(UInt8MultiArray, '/pwb/servos_target_angles', 10)
+    lift_pub  = node.create_publisher(UInt16,          '/pwb/lift_target_height',   qos_profile_parameters)
+    servo_pub = node.create_publisher(UInt8MultiArray, '/pwb/servos_target_angles', qos_profile_parameters)
 
     # Настройки
     linear = 0.5

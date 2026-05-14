@@ -1,11 +1,12 @@
 import rclpy
 from rclpy.node import Node
 import json
+import tkinter
 
 try:
     from target_types import TargetType, LiftTarget, SleepTarget
 except:
-    from route_follower.target_types import TargetType, LiftTarget, SleepTarget
+    from route_follower.target_types import TargetType, LiftTarget, SleepTarget, NavTarget, ServoTarget
 
 class Parameters:
     def __init__(self, node: Node):
@@ -25,9 +26,11 @@ class TargetHandler:
         self.wait = True
 
     def set_target(self, parameters: dict) -> bool:
-        if 'wait' in parameters.keys() and isinstance(parameters['wait'], bool):
-            self.wait = parameters['wait']
-            parameters.pop('wait')
+        try:
+            self.wait = bool(parameters.get('wait', True))
+        except:
+            self.wait = True
+
         return self.tgt.set_target(parameters)
     
     def is_complete(self) -> bool:
@@ -44,21 +47,31 @@ class RouteFollower(Node):
         self.parameters = Parameters(self)
 
         self.target_types: dict[str:TargetType] = {
-            "move_lift": LiftTarget(self),
-            "sleep": SleepTarget(self),
+            "move_lift":  LiftTarget(self),
+            "sleep":      SleepTarget(self),
+            "nav_tgt":    NavTarget(self),
+            "move_servo": ServoTarget(self),
         }
         
         self.tasks: dict[str:TargetHandler] = {}
         self.get_logger().info(f"Read json file: {self.parameters.file}")
         with open(self.parameters.file, "r") as f:
-            self.route = json.load(f)
+            try:
+                self.route = json.load(f)
+            except Exception as e:
+                self.get_logger().error(f"Error on parsng JSON: {str(e)}")
+                self.get_logger().info("Shutdown...")
+                rclpy.shutdown()
+                exit(-1)
 
         if not self.check_json(self.route):
-            self.get_logger().error(f"JSON error. Shutdown...")
-            raise Exception("JSON Parse error")
-        
-        self.current_iter = 0
+            self.get_logger().error(f"Error on checking JSON")
+            self.get_logger().info("Shutdown...")
+            rclpy.shutdown()
+            exit(-1)
 
+
+        self.current_iter = 0
         self.main_timer = self.create_timer(0.1, self.main_cycle)
         
     def main_cycle(self):
@@ -77,24 +90,31 @@ class RouteFollower(Node):
         self.get_logger().info(f"New tasks: {tasks}")
         for name in tasks.keys():
             if not name in self.tasks.keys():
-                self.get_logger().info(f"Creating new task <{name}>")
                 self.tasks[name] = TargetHandler(self.target_types[name])
-            self.tasks[name].set_target(tasks[name])
+            self.get_logger().info(f"Setting new task <{name}> wait: {tasks[name].get('wait', True)}")
+            if not self.tasks[name].set_target(tasks[name]):
+                self.get_logger().error(f"Failed to set target <{name}>")
+                self.get_logger().info("Shutdown...")
+                rclpy.shutdown()
+                return
 
 
     def check_json(self, route) -> bool:
         types_set = set(self.target_types.keys())
         if not isinstance(route, list):
+            self.get_logger().error(f"Wrong JSON reference")
             return False
         
-        for tgt in route:
-            if not isinstance(tgt, dict):
+        for tgts in route:
+            if not isinstance(tgts, dict):
+                self.get_logger().error(f"Wrong JSON reference")
                 return False
             
-            cur_set = set(tgt.keys())
+            cur_set = set(tgts.keys())
             if not cur_set.issubset(types_set):
                 self.get_logger().error(f"Unknown target type(s): {cur_set.difference(types_set)}")
                 return False
+        
         return True
 
 
@@ -102,7 +122,7 @@ class RouteFollower(Node):
         waiting = False
         completed_tasks: list[str] = []
         for name in self.tasks.keys():
-            task = self.tasks[name]
+            task: TargetHandler = self.tasks[name]
 
             if task.wait and not task.is_complete():
                 waiting = True

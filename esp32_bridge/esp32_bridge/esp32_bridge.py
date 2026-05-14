@@ -19,6 +19,9 @@ from geometry_msgs.msg import Twist, Quaternion, PoseWithCovarianceStamped
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 
+# Services
+from std_srvs.srv import Trigger 
+
 # TF
 from tf2_ros import (
     TransformBroadcaster,
@@ -26,8 +29,9 @@ from tf2_ros import (
     TransformStamped,
 )
 
+from rclpy.qos  import qos_profile_parameters
 
-    
+
     
     
 # Helper functions    
@@ -61,7 +65,7 @@ class Parameters:
         self.port = self.create_parameter("port", 8080)
         self.lidar_port = self.create_parameter("lidar_port", 8090)
 
-        self.ping_frequency = self.create_parameter("ping_frequency", 10) # Hz (герцы)
+        self.ping_frequency = self.create_parameter("ping_frequency", 10.0) # Hz (герцы)
 
         # Имена фреймов
         self.odom_frame  = self.create_parameter("odom_frame", "pwb_odom")
@@ -146,22 +150,27 @@ class Esp32_Bridge(Node):
         # Полжение скана лидара
         self.lidar_x = 0.0
         self.lidar_y = 0.0
-        self.lidar_theta = 0.0               
+        self.lidar_theta = 0.0     
+
+        
         
         # ROS publishers
         self.odom_publisher = self.create_publisher(Odometry, "/pwb/odom", 10)
         self.lift_h_pub = self.create_publisher(UInt16, '/pwb/lift_current_height', 10)
         self.servo_pos_pub = self.create_publisher(UInt8MultiArray, '/pwb/servos_current_angles', 10)
         self.scan_pub = self.create_publisher(LaserScan, "/pwb/lidar_scan", 10)
-        self.side_pub = self.create_publisher(String, "/pwb/side", 10)
-        self.start_pub = self.create_publisher(Bool, "/pwb/start", 10)
+        self.side_pub = self.create_publisher(String, "/pwb/side", qos_profile_parameters)
+        self.start_pub = self.create_publisher(Bool, "/pwb/start", qos_profile_parameters)
         
         
         # ROS subscriptions
         self.cmd_vel_sub = self.create_subscription(Twist, '/pwb/cmd_vel', self.receive_motors_speed, 10)
-        self.lift_h_sub = self.create_subscription(UInt16, '/pwb/lift_target_height', self.receive_lift_height, 10)
-        self.servo_pos_sub = self.create_subscription(UInt8MultiArray, '/pwb/servos_target_angles', self.receive_servo_state, 10)
-        self.pose_sub = self.create_subscription(PoseWithCovarianceStamped, "/initialpose", self.receive_pose, 10)
+        self.lift_h_sub = self.create_subscription(UInt16, '/pwb/lift_target_height', self.receive_lift_height, qos_profile_parameters)
+        self.servo_pos_sub = self.create_subscription(UInt8MultiArray, '/pwb/servos_target_angles', self.receive_servo_state, qos_profile_parameters)
+        self.pose_sub = self.create_subscription(PoseWithCovarianceStamped, "/initialpose", self.receive_pose, qos_profile_parameters)
+        
+        # Services
+        self.route_client = self.create_client(Trigger, "/start_route_execution")
         
         # TF
         self.tf_br = TransformBroadcaster(self)
@@ -223,6 +232,7 @@ class Esp32_Bridge(Node):
             tf.transform.translation.x = float(self.parameters.base_lift_xyz[0])
             tf.transform.translation.y = float(self.parameters.base_lift_xyz[1])
             tf.transform.translation.z = float(self.parameters.base_lift_xyz[2] + self.lift_height / 1000)
+            tf.transform.rotation = Quaternion()
             self.tf_br.sendTransform(tf)
 
             # servo tfs
@@ -381,6 +391,8 @@ class Esp32_Bridge(Node):
                     self.get_logger().info(f"Start: {self.start}")
                     if not self.start:
                         self.esp_client.set_motors_speed(0.0, 0.0)
+                    else:
+                        self.route_client.call_async(Trigger.Request())
                     
                 case _:
                     self.get_logger().warn("Undefine event type:" + msg['event'])

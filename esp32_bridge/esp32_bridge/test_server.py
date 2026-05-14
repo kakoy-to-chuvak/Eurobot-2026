@@ -130,10 +130,10 @@ class LidarServer:
             [[-1.5 - beacon_size, 1.0], [-1.5, 1.0]],
 
             # test lines
-            [[0.0, 0.0], [0.0, beacon_size]],
-            [[0.0, beacon_size], [beacon_size, beacon_size]],
-            [[beacon_size, beacon_size], [beacon_size, 0.0]],
-            [[beacon_size, 0.0], [0.0, 0.0]],
+            # [[0.0, 0.0], [0.0, beacon_size]],
+            # [[0.0, beacon_size], [beacon_size, beacon_size]],
+            # [[beacon_size, beacon_size], [beacon_size, 0.0]],
+            # [[beacon_size, 0.0], [0.0, 0.0]],
         ]
 
         self._noisy_lines = self._static_lines[:]

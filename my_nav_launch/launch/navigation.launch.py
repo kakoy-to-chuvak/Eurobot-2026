@@ -60,6 +60,14 @@ def generate_launch_description():
             'node_names': ['map_server']
         }]
     )
+
+    amcl_cmd = Node(
+        package='nav2_amcl',
+        executable='amcl',
+        name='amcl',
+        output='screen',
+        parameters=[config_file],
+    )
     
     # --- 3. Запуск самой навигации ---
     
@@ -82,6 +90,7 @@ def generate_launch_description():
         declare_use_sim_time_arg,
         map_server_cmd,
         lifecycle_manager_cmd,
+        amcl_cmd,
         nav2_cmd
     ])
     
