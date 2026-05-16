@@ -5,9 +5,8 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Main Grid1/Offset1
-        - /TF1/Status1
         - /TF1/Frames1
-        - /TF1/Frames1/lift1
+        - /PoseWithCovariance1
       Splitter Ratio: 0.514211893081665
     Tree Height: 707
   - Class: rviz_common/Selection
@@ -297,6 +296,41 @@ Visualization Manager:
       Plane Cell Count: 60
       Reference Frame: map
       Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz_default_plugins/PoseWithCovariance
+      Color: 255; 25; 0
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: true
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: PoseWithCovariance
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /initialpose
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -343,25 +377,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 4.636744976043701
+      Distance: 3.7057769298553467
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.5505234003067017
-        Y: -0.2523135244846344
-        Z: 0.14401012659072876
+        X: -0.294241338968277
+        Y: 0.033877938985824585
+        Z: -0.10468887537717819
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.4797964096069336
+      Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.522678017616272
+      Yaw: 4.775897026062012
     Saved: ~
 Window Geometry:
   Displays:

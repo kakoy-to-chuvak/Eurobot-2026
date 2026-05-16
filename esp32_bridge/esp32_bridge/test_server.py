@@ -27,12 +27,18 @@ class RobotState:
 
     def __init__(self):
         # Одометрия
-        self.x = 1.2
+        self.x = -1.2
         self.y = 0.75
         self.theta = math.pi * 3 / 2
         self.linear_speed = 0.0
         self.angular_speed = 0.0
         self._last_odom_time = 0.0
+
+        self.ex = -1.2
+        self.ey = 0.75
+        self.etheta = math.pi * 3 / 2
+
+        self.error_k = 0.01
 
         # Лифт
         self.lift_target = 0
@@ -61,14 +67,23 @@ class RobotState:
         ds = self.linear_speed * dt
 
         self.theta += self.angular_speed * dt
+        self.etheta += self.angular_speed * dt * ( self.error_k + 1 )
         # Нормировка угла в [-pi, pi]
         if self.theta > math.pi:
             self.theta -= 2 * math.pi
         elif self.theta < -math.pi:
             self.theta += 2 * math.pi
 
+        if self.etheta > math.pi:
+            self.etheta -= 2 * math.pi
+        elif self.etheta < -math.pi:
+            self.etheta += 2 * math.pi
+
         self.x += ds * math.cos(self.theta)
         self.y += ds * math.sin(self.theta)
+
+        self.ex += ds * math.cos(self.etheta) * ( self.error_k + 1 )
+        self.ey += ds * math.sin(self.etheta) * ( self.error_k + 1 )
         self._last_odom_time = now
 
     def update_lift(self) -> None:
@@ -128,12 +143,6 @@ class LidarServer:
             [[-1.5, 1.0 - beacon_size], [-1.5 - beacon_size, 1.0 - beacon_size]],
             [[-1.5 - beacon_size, 1.0 - beacon_size], [-1.5 - beacon_size, 1.0]],
             [[-1.5 - beacon_size, 1.0], [-1.5, 1.0]],
-
-            # test lines
-            # [[0.0, 0.0], [0.0, beacon_size]],
-            # [[0.0, beacon_size], [beacon_size, beacon_size]],
-            # [[beacon_size, beacon_size], [beacon_size, 0.0]],
-            # [[beacon_size, 0.0], [0.0, 0.0]],
         ]
 
         self._noisy_lines = self._static_lines[:]
@@ -154,8 +163,8 @@ class LidarServer:
 
     def _create_random_lines(self,
                              min_r: float = 2.4,
-                             max_r: float = 3.6,
-                             noise_power: int = 100,
+                             max_r: float = 2.8,
+                             noise_power: int = 200,
                              k: float = 1.4,
                              line_creation: float = 0.6) -> list:
         """Генерирует случайные отрезки для имитации шумовых объектов."""
@@ -258,7 +267,7 @@ class LidarServer:
             packet = packet[:-extra]
         return bytes(packet)
 
-    def publish(self, robot_theta: float, xPos: float, yPos: float) -> None:
+    def publish(self, robot: RobotState) -> None:
         """Отправляет один лидарный пакет с одометрией клиенту."""
         now = time.perf_counter()
         if now - self._last_publish_time < self._publish_delay:
@@ -278,7 +287,7 @@ class LidarServer:
 
         if self._client_socket:
             try:
-                lidar_data = self._build_lidar_packet(robot_theta, xPos, yPos)
+                lidar_data = self._build_lidar_packet(robot.theta, robot.x, robot.y)
 
                 # Новый формат: [тип(1)][theta(4)][x(4)][y(4)][лидарные_данные][CRC16(2)]
                 LIDAR_MSG_TYPE = 110
@@ -286,7 +295,7 @@ class LidarServer:
                 # Собираем пакет
                 packet = bytearray()
                 packet.append(LIDAR_MSG_TYPE)
-                packet.extend(struct.pack("<fff", robot_theta, xPos, yPos))
+                packet.extend(struct.pack("<fff", robot.etheta, robot.ex, robot.ey))
                 packet.extend(lidar_data)
 
                 # Вычисляем CRC (от всего пакета без CRC в конце)
@@ -366,21 +375,21 @@ class EspClientHandler:
                               *robot.servo_current)
 
             case "GET_ODOMETRY":
-                self.send_msg("ANSWER_GET_ODOMETRY", "fff", robot.theta, robot.x, robot.y)
+                self.send_msg("ANSWER_GET_ODOMETRY", "fff", robot.etheta, robot.ex, robot.ey)
 
             case "GET_ALL":
                 self.send_msg("ANSWER_GET_ALL", "ffHBBBBfff",
                               robot.linear_speed, robot.angular_speed,
                               int(robot.lift_current),
                               *robot.servo_current,
-                              robot.theta, robot.x, robot.y)
+                              robot.etheta, robot.ex, robot.ey)
 
             case "SET_MOTORS_SPEED":
                 robot.linear_speed, robot.angular_speed = struct.unpack("ff", payload)
 
             case "SET_ODOMETRY":
-                robot.x, robot.y, robot.theta = struct.unpack("fff", payload)
-                print(f"set odom: {robot.x} {robot.y}")
+                robot.ex, robot.ey, robot.etheta = struct.unpack("fff", payload)
+                print(f"set odom: {robot.ex} {robot.ey}")
 
             case "SET_LIFT_HEIGHT":
                 h = struct.unpack("H", payload)[0]
@@ -480,7 +489,7 @@ def main():
             esp_server.handle_client()
 
             # Лидар (использует текущий угол робота)
-            lidar_server.publish(esp_server.robot.theta, esp_server.robot.x, esp_server.robot.y)
+            lidar_server.publish(esp_server.robot)
 
             time.sleep(0.01)   # небольшая пауза для снижения загрузки CPU
     

@@ -161,6 +161,7 @@ class Esp32_Bridge(Node):
         self.scan_pub = self.create_publisher(LaserScan, "/pwb/lidar_scan", 10)
         self.side_pub = self.create_publisher(String, "/pwb/side", qos_profile_parameters)
         self.start_pub = self.create_publisher(Bool, "/pwb/start", qos_profile_parameters)
+        self.side_timer = self.create_timer(0.5, self.publish_side)
         
         
         # ROS subscriptions
@@ -170,13 +171,28 @@ class Esp32_Bridge(Node):
         self.pose_sub = self.create_subscription(PoseWithCovarianceStamped, "/initialpose", self.receive_pose, qos_profile_parameters)
         
         # Services
-        self.route_client = self.create_client(Trigger, "/start_route_execution")
+        self.route_client = self.create_client(Trigger, "/route_follower/start")
         
         # TF
         self.tf_br = TransformBroadcaster(self)
         self.static_br = StaticTransformBroadcaster(self)
         self._publish_static_tf()
         self.publish_odometry()
+    
+    def route_start_callback(self, future):
+        try:
+            response = future.result()
+            if response.success:
+                self.get_logger().info(f"Route started: {response.message}")
+            else:
+                self.get_logger().error(f"Failed to start route: {response.message}")
+        except Exception as e:
+            self.get_logger().error(f"Service call failed: {e}")
+    
+    def publish_side(self):
+        msg = String()
+        msg.data = self.side
+        self,self.side_pub
         
     def receive_pose(self, pose: PoseWithCovarianceStamped):
         self.xPos = pose.pose.pose.position.x
@@ -392,7 +408,11 @@ class Esp32_Bridge(Node):
                     if not self.start:
                         self.esp_client.set_motors_speed(0.0, 0.0)
                     else:
-                        self.route_client.call_async(Trigger.Request())
+                        if self.route_client.service_is_ready():
+                            future = self.route_client.call_async(Trigger.Request())
+                            future.add_done_callback(self.route_start_callback)
+                        else:
+                            self.get_logger().warn("Route follower service not available")
                     
                 case _:
                     self.get_logger().warn("Undefine event type:" + msg['event'])

@@ -1,7 +1,8 @@
 import rclpy
 from rclpy.node import Node
 import json
-import tkinter
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
 
 try:
     from target_types import TargetType, LiftTarget, SleepTarget
@@ -73,6 +74,20 @@ class RouteFollower(Node):
 
         self.current_iter = 0
         self.main_timer = self.create_timer(0.1, self.main_cycle)
+        self.state_pub = self.create_publisher(String, "/pwb/tasks", 10)
+        self.start_service = self.create_service(Trigger, '/route_follower/start', self.start_callback)
+        self.started = False
+    
+    def start_callback(self, request, response):
+        if self.started:
+            response.success = False
+            response.message = "Route already started"
+            return response
+        self.started = True
+        self.get_logger().info("Route execution started by service call")
+        response.success = True
+        response.message = "Route started"
+        return response
         
     def main_cycle(self):
         if self.check_tasks():
@@ -120,19 +135,32 @@ class RouteFollower(Node):
 
     def check_tasks(self) -> bool:
         waiting = False
+        current_tasks = {}
         completed_tasks: list[str] = []
         for name in self.tasks.keys():
             task: TargetHandler = self.tasks[name]
-
-            if task.wait and not task.is_complete():
+            complete = task.is_complete()
+            progress = task.get_progress()
+            
+            if task.wait and not complete:
                 waiting = True
 
-            if task.is_complete():
+            if complete:
                 self.get_logger().info(f"Task <{name}> completed!")
                 completed_tasks.append(name)
             else:
-                self.get_logger().debug(f"Task <{name}>: {task.get_progress() * 100:.2f}%")
+                self.get_logger().debug(f"Task <{name}>: {progress * 100:.2f}%")
+                current_tasks[name] = {
+                    "wait": task.wait,
+                    "progress": progress
+                }
+        
+        current_tasks['completed'] = completed_tasks
+        msg = String()
+        msg.data = str(current_tasks)
+        self.state_pub.publish(msg)
 
+        # delete completed tasks
         for name in completed_tasks:
             self.tasks.pop(name)
         return waiting
